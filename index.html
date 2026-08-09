@@ -33,7 +33,8 @@
     .cell .mName{ font-size:9px; height:20px; }
     .cell .mStats{ font-size:13px; }
     .card{ flex:0 0 96px; height:132px; }
-    .card .cEmoji{ font-size:34px; }
+    .card .cArt{ height:52px; }
+    .card .cArt .cEmoji{ font-size:32px; }
     .card .cName{ font-size:10px; }
     .card .cDesc{ font-size:9px; }
     .herobar .face{ font-size:32px; }
@@ -76,8 +77,14 @@
   #handWrap { order:6; }
   #controls { order:7; }
 
-  /* phase banner */
-  #phaseBanner { text-align:center; font-size:11px; letter-spacing:1px; text-transform:uppercase; padding:3px; color:#c9c39b; background:#00000033; }
+  /* phase banner: turn label + always-visible phase sequence so the zombie split-phase structure is legible */
+  #phaseBanner { text-align:center; font-size:11px; padding:3px 3px 4px; color:#c9c39b; background:#00000033; }
+  #phaseBanner .turnLabel { letter-spacing:1px; text-transform:uppercase; }
+  .phaseSteps { display:flex; justify-content:center; gap:3px; margin-top:2px; font-size:10px; }
+  .phaseSteps .step { padding:1px 7px; border-radius:9px; background:#ffffff0d; color:#8b8b7a; border:1px solid transparent; }
+  .phaseSteps .step.now { background:#ffd75e22; color:#ffd75e; border-color:#ffd75e66; font-weight:700; }
+  .phaseSteps .step.done { opacity:0.45; text-decoration:line-through; }
+  .phaseSteps .arrow { color:#ffffff33; }
 
   /* board */
   #board { flex:1; display:flex; flex-direction:column; justify-content:center; gap:6px; padding:6px 8px; min-height:0; }
@@ -165,23 +172,43 @@
 
   /* hint + log */
   #hintBar { padding:4px 10px; font-size:12px; min-height:22px; color:#ffd75e; text-align:center; }
-  #logBar { padding:2px 10px 4px; font-size:10px; color:#9aa88f; text-align:center; min-height:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #logBar { padding:2px 10px 4px; font-size:10px; color:#9aa88f; text-align:center; min-height:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+  #logBar:not(:empty)::after { content:" ⌄"; color:#ffffff55; }
 
   /* hand */
   #handWrap { padding:4px 6px 8px; }
   #hand { display:flex; gap:6px; overflow-x:auto; padding:4px 2px 6px; -webkit-overflow-scrolling:touch; }
   /* edge fade is applied dynamically via JS (mask-image) when the hand scrolls off-screen */
   .card {
-    flex:0 0 74px; height:104px; border-radius:9px; padding:4px 3px;
-    background:linear-gradient(180deg,#2a3626,#1b241a); border:1.5px solid #ffffff2e;
+    flex:0 0 74px; height:104px; border-radius:10px; padding:3px 3px 4px;
+    background:linear-gradient(180deg,#2f3d2a,#182016);
+    border:1.5px solid #8fbf7a4d;
+    box-shadow:0 2px 6px #0007, inset 0 1px 0 #ffffff14;
     display:flex; flex-direction:column; align-items:center; position:relative;
   }
-  body[data-active="zombie"] .card { background:linear-gradient(180deg,#332a40,#221a2c); }
-  .card.unplayable { opacity:0.42; }
+  body[data-active="zombie"] .card { background:linear-gradient(180deg,#3a2f47,#201827); border-color:#c9a2ff42; }
+  /* art window: shows a mapped custom image if one exists, otherwise the card's emoji */
+  .card .cArt {
+    width:calc(100% - 6px); height:38px; margin-top:6px; border-radius:6px; flex:0 0 auto;
+    background:radial-gradient(ellipse at 50% 35%, #ffffff1e, #00000048 78%);
+    border:1px solid #ffffff1f; box-shadow:inset 0 1px 4px #0008;
+    display:flex; align-items:center; justify-content:center; overflow:hidden;
+  }
+  .card .cArt .cEmoji { font-size:24px; margin:0; filter:drop-shadow(0 2px 2px #0009); }
+  .card .cArt img { width:100%; height:100%; object-fit:cover; display:block; }
+  .cell img.mArt { width:34px; height:34px; border-radius:50%; object-fit:cover; border:1px solid #ffffff2e; }
+  .card.unplayable { opacity:0.62; filter:grayscale(0.65) brightness(0.8); }
+  .card.unplayable::after { content:"🔒"; position:absolute; top:2px; right:3px; font-size:11px; filter:none; text-shadow:0 1px 2px #000; }
   .card.selected { border-color:#ffd75e; box-shadow:0 0 10px #ffd75e77; transform:translateY(-6px); }
-  .card .cost { position:absolute; top:-5px; left:-4px; background:#e0c14f; color:#1a1a10; width:19px; height:19px; border-radius:50%; font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px #000a; }
-  .card .cEmoji { font-size:26px; margin-top:6px; }
-  .card .cName { font-size:8.5px; font-weight:700; text-align:center; line-height:1.1; margin-top:2px; }
+  .card .cost {
+    position:absolute; top:-6px; left:-5px; width:20px; height:20px; z-index:2;
+    background:linear-gradient(135deg,#f5dd7a,#c9a437); color:#221c07;
+    transform:rotate(45deg); border-radius:5px;
+    box-shadow:0 1px 3px #000c, inset 0 1px 0 #ffffff88;
+    display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800;
+  }
+  .card .cost span { transform:rotate(-45deg); }
+  .card .cName { font-size:8.5px; font-weight:700; text-align:center; line-height:1.1; margin-top:3px; width:calc(100% - 4px); background:#00000042; border-radius:4px; padding:1px 2px; }
   .card .cDesc { font-size:7.5px; text-align:center; color:#b8c4a8; line-height:1.15; margin-top:1px; flex:1; overflow:hidden; }
   .card .cStats { font-size:10px; font-weight:800; display:flex; gap:6px; }
   .card .cStats .a { color:#ffb95e; } .card .cStats .h { color:#7fe06d; }
@@ -190,11 +217,11 @@
   /* controls */
   #controls { display:flex; gap:8px; padding:0 10px 10px; align-items:center; }
   button.btn {
-    flex:1; padding:11px; border-radius:10px; border:none; font-size:14px; font-weight:700;
+    flex:1; padding:11px; min-height:46px; border-radius:10px; border:none; font-size:14px; font-weight:700;
     background:linear-gradient(180deg,#5a8f4d,#3f6b35); color:#fff; box-shadow:0 2px 0 #2a4a24;
   }
   button.btn:active { transform:translateY(1px); }
-  button.btn.small { flex:0 0 auto; padding:11px 14px; background:linear-gradient(180deg,#555,#3a3a3a); box-shadow:0 2px 0 #2a2a2a; font-size:12px; }
+  button.btn.small { flex:0 0 auto; padding:11px 14px; min-width:46px; min-height:46px; background:linear-gradient(180deg,#555,#3a3a3a); box-shadow:0 2px 0 #2a2a2a; font-size:12px; }
   body[data-active="zombie"] button.btn:not(.small) { background:linear-gradient(180deg,#7a5aa0,#5a3f7a); box-shadow:0 2px 0 #3d2a55; }
 
   /* home screen */
@@ -227,8 +254,8 @@
   #compendiumScreen .card .cDesc { overflow:visible; }
   /* the compendium is reachable before any turn sets body[data-active], so its cards
      must not depend on that leftover attribute — state their own colors outright */
-  #compendiumScreen #compPlantGrid .card { background:linear-gradient(180deg,#2a3626,#1b241a); }
-  #compendiumScreen #compZombieGrid .card { background:linear-gradient(180deg,#332a40,#221a2c); }
+  #compendiumScreen #compPlantGrid .card { background:linear-gradient(180deg,#2f3d2a,#182016); border-color:#8fbf7a4d; }
+  #compendiumScreen #compZombieGrid .card { background:linear-gradient(180deg,#3a2f47,#201827); border-color:#c9a2ff42; }
 
   /* overlay */
   #overlay {
@@ -254,6 +281,7 @@
   <h1>Garden Brawl</h1>
   <p class="tagline">A lane battler for two — pass the phone and go head to head, hotseat style.</p>
   <div class="homeButtons">
+    <button class="homeBtn primary hidden" id="resumeBtn">⏯ Resume Game</button>
     <button class="homeBtn primary" id="playBtn">▶ Play</button>
     <button class="homeBtn secondary" id="compendiumBtn">📖 Compendium</button>
   </div>
@@ -303,6 +331,7 @@
   <div id="handWrap"><div id="hand"></div></div>
   <div id="controls">
     <button class="btn small" id="helpBtn">?</button>
+    <button class="btn small hidden" id="mullBtn">🔄 Mulligan</button>
     <button class="btn" id="endBtn">End Phase</button>
     <button class="btn small" id="newBtn">New</button>
   </div>
@@ -312,6 +341,14 @@
 <script>
 "use strict";
 /* ============ CARD DATA ============ */
+/* CUSTOM CARD ART
+   Draw a card, add the image file to an art/ folder in the repo, then map the exact card
+   name to its path here. Any card without an entry keeps its emoji. Square-ish images look
+   best (cropped to fit). Small thumbnails also appear on the board when the minion is placed.
+   Example:  const CARD_ART = { "Foot Soldier":"art/foot-soldier.png", "Nut Wall":"art/nut-wall.jpg" };  */
+const CARD_ART = {};
+function artFor(name){ return CARD_ART[name] || null; }
+
 const KWNAME = { deadly:"☠️Deadly", armored:"🛡️Armored 1", strike:"⤳Strikethrough", frenzy:"🔥Frenzy" };
 const KWDESC = {
   deadly:"☠️ Deadly: destroys any minion it damages",
@@ -322,39 +359,44 @@ const KWDESC = {
 function M(n,e,c,a,h,kw,op,d){ return {t:"m",n,e,c,a,h,kw:kw||[],op:op||null,d:d||""}; }
 function T(n,e,c,fx,d){ return {t:"t",n,e,c,fx,d}; }
 
+/* FACTION IDENTITY (first pass, deliberately modest — rebalance freely):
+   Plants lean DEFENSIVE — tougher bodies, healing, defensive buff.
+   Regime leans AGGRESSIVE — bigger attack on glass bodies, AoE damage, offensive buff. */
 const PLANT_POOL = [
-  M("Sprout Shooter","🌱",1,1,2),
+  M("Sprout Shooter","🌱",1,1,3),                                   // was 1/2 — sturdier early body
   M("Sunflower Sage","🌻",2,1,2,[],{k:"draw",n:1},"When played: draw a card"),
-  M("Nut Wall","🥜",2,0,6),
+  M("Nut Wall","🥜",2,0,7),                                         // was 0/6
   M("Deadly Shroom","🍄",2,1,1,["deadly"]),
   M("Thorn Lasher","🌵",2,3,1),
-  M("Cabbage Lobber","🥬",3,2,4),
+  M("Cabbage Lobber","🥬",3,2,5),                                   // was 2/4
   M("Pepper Sniper","🌶️",3,2,2,[],{k:"dmgLane",n:2},"When played: deal 2 dmg to the Regime unit in this lane"),
   M("Snap Trap","🌺",3,3,2,["frenzy"]),
   M("Melon Guard","🍈",4,3,5,["armored"]),
-  M("Bamboo Skewer","🎋",4,4,2,["strike"]),
-  M("Oak Titan","🌳",6,6,6),
-  T("Grow Big","🌿",1,{k:"buff",a:2,h:2},"Give a plant +2/+2"),
+  M("Bamboo Skewer","🎋",4,3,3,["strike"]),                          // was 4/2 — survives more trades
+  M("Oak Titan","🌳",6,5,8),                                        // was 6/6 — the wall that wins long games
+  T("Grow Big","🌿",1,{k:"buff",a:1,h:3},"Give a plant +1/+3"),      // was +2/+2 — defensive buff
   T("Solar Flare","☀️",2,{k:"dmg",n:3},"Deal 3 damage to a Regime minion or hero"),
   T("Photosynthesize","🍃",2,{k:"draw",n:2},"Draw 2 cards"),
+  T("Healing Rain","🌧️",2,{k:"heal",n:4},"Restore 4 HP to your hero (max 20)"), // NEW — plants alone can heal
   T("Devour","🪴",5,{k:"destroy"},"Destroy a Regime minion")
 ];
-/* the "Regime" faction — a history / government-systems reskin, same stats and keywords as before */
+/* the "Regime" faction — history / government-systems theme */
 const ZOMBIE_POOL = [
   M("Foot Soldier","🪖",1,1,2),
   M("Agitator","📢",1,2,1),
   M("Bureaucrat","📋",2,1,2,[],{k:"draw",n:1},"When played: draw a card"),
   M("Checkpoint Guard","🚧",2,2,3),
   M("Informant","🐀",2,1,1,["deadly"]),
-  M("Propagandist","📻",3,2,4),
+  M("Propagandist","📻",3,3,3),                                     // was 2/4 — hits harder, folds faster
   M("Saboteur","🧨",3,2,2,[],{k:"dmgLane",n:2},"When played: deal 2 dmg to the plant in this lane"),
   M("Shock Trooper","💥",3,3,2,["frenzy"]),
   M("Riot Police","👮",4,3,5,["armored"]),
-  M("Cavalry Charge","🐎",4,4,2,["strike"]),
-  M("Iron Curtain","🧱",6,6,6),
-  T("Communist Manifesto","📕",1,{k:"buff",a:2,h:2},"Give a Regime minion +2/+2"),
+  M("Cavalry Charge","🐎",4,5,1,["strike"]),                         // was 4/2 — all-in glass cannon
+  M("Iron Curtain","🧱",6,7,5),                                     // was 6/6 — offense over defense
+  T("Communist Manifesto","📕",1,{k:"buff",a:3,h:1},"Give a Regime minion +3/+1"), // was +2/+2 — offensive buff
   T("Blitzkrieg","⚡",2,{k:"dmg",n:3},"Deal 3 damage to a plant or the plant hero"),
   T("Requisition","📦",2,{k:"draw",n:2},"Draw 2 cards"),
+  T("Purge","🩸",2,{k:"aoe",n:1},"Deal 1 damage to ALL plant minions"), // NEW — regime alone gets AoE
   T("Show Trial","⚖️",5,{k:"destroy"},"Destroy a plant minion")
 ];
 /* ============ HELPERS ============ */
@@ -367,16 +409,46 @@ function P(s){ return S.players[s]; }
 function sideName(s){ return s==="plant" ? "🌻 Plants" : "🎖️ Regime"; }
 function kwSymbols(m){ return m.kw.map(k=>({deadly:"☠️",armored:"🛡️",strike:"⤳",frenzy:"🔥"}[k])).join(""); }
 
+/* ============ SAVE / RESUME ============ */
+/* survives an accidental refresh or tab close mid-match; cleared when a game ends */
+const SAVE_KEY="gardenBrawlSave";
+function saveGame(){
+  if(!S || S.over || S.phase==="combat") return; // combat is transient — resume lands on the last stable phase
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){}
+}
+function clearSave(){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} }
+function loadSave(){
+  try{
+    const raw=localStorage.getItem(SAVE_KEY);
+    if(!raw) return null;
+    const s=JSON.parse(raw);
+    return (s && s.players && s.lanes && !s.over) ? s : null;
+  }catch(e){ return null; }
+}
+function resumeGame(){
+  const s=loadSave();
+  if(!s){ $("resumeBtn").classList.add("hidden"); return; }
+  S=s; uiLock=false;
+  document.body.dataset.active=S.active;
+  showScreen("app");
+  showHandoff(); // re-show the pass screen so nobody's hand is exposed on resume
+  render();
+}
+
 /* ============ GAME SETUP ============ */
+function shuffle(arr){
+  for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+  return arr;
+}
 function buildDeck(pool){
   const deck=[];
   pool.forEach(c=>{ deck.push({...c}); deck.push({...c}); });
-  for(let i=deck.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [deck[i],deck[j]]=[deck[j],deck[i]]; }
-  return deck;
+  return shuffle(deck);
 }
 function newGame(){
   S = {
     turn:0, phase:"idle", active:"zombie", over:false, sel:null, log:[],
+    mull:{plant:true,zombie:true}, acted:{plant:false,zombie:false},
     lanes: Array.from({length:5},()=>({plant:null,zombie:null})),
     players:{
       plant:{hp:20,res:0,deck:buildDeck(PLANT_POOL),hand:[]},
@@ -413,6 +485,24 @@ function endPhase(){
   else if(S.phase==="z2") combat();
 }
 
+/* one free redraw per player, only on turn 1 before they've played anything.
+   Regime's window is its first phase (z1) so it can't mulligan after seeing the plant turn. */
+function canMulligan(){
+  return S && !S.over && S.turn===1 && S.mull && S.mull[S.active] && !S.acted[S.active] &&
+    (S.active==="plant" ? S.phase==="p" : S.phase==="z1");
+}
+function doMulligan(){
+  if(uiLock||!canMulligan()) return;
+  const p=P(S.active), n=p.hand.length;
+  p.deck.push(...p.hand.splice(0));
+  shuffle(p.deck);
+  draw(S.active,n);
+  S.mull[S.active]=false;
+  addLog(`${sideName(S.active)} mulligans (${n} cards)`);
+  hint("New hand drawn — no redos!");
+  S.sel=null; render();
+}
+
 /* ============ PLAYING CARDS ============ */
 function canPlayCard(card){
   if(card.c > P(S.active).res) return false;
@@ -422,6 +512,8 @@ function canPlayCard(card){
   const fx=card.fx;
   if(fx.k==="buff") return S.lanes.some(l=>l[S.active]);
   if(fx.k==="destroy") return S.lanes.some(l=>l[otherSide(S.active)]);
+  if(fx.k==="aoe") return S.lanes.some(l=>l[otherSide(S.active)]);
+  if(fx.k==="heal") return P(S.active).hp<20;
   return true; // dmg (hero always targetable), draw
 }
 function onCardTap(i){
@@ -432,35 +524,41 @@ function onCardTap(i){
     if(card.c>P(S.active).res) hint("Not enough "+(S.active==="plant"?"sun ☀️":"decrees 📜"));
     else if(S.phase==="z1"&&card.t==="t") hint("Tricks come later this turn");
     else if(S.phase==="z2"&&card.t==="m") hint("Tricks only in this phase");
+    else if(card.t==="t"&&card.fx.k==="heal") hint("Already at full HP");
     else hint("No valid target / no free lane");
     return;
   }
   if(S.sel===i){
-    if(card.t==="t"&&card.fx.k==="draw"){ castTrick(i,null); return; }
+    if(card.t==="t"&&["draw","heal","aoe"].includes(card.fx.k)){ castTrick(i,null); return; }
     S.sel=null; render(); return;
   }
   S.sel=i; render();
 }
+function cancelSel(){ if(S && S.sel!==null && !uiLock){ S.sel=null; render(); } }
 function onCellTap(lane,side){
   if(uiLock||S.over||S.sel===null) return;
   const card=P(S.active).hand[S.sel];
   if(!card) return;
   if(card.t==="m"){
     if(side===S.active && !S.lanes[lane][S.active]) playMinion(S.sel,lane);
+    else cancelSel(); // tapped an invalid spot — treat as "never mind"
     return;
   }
   const m=S.lanes[lane][side], fx=card.fx;
-  if(!m) return;
+  if(!m){ cancelSel(); return; }
   if(fx.k==="buff" && side===S.active) castTrick(S.sel,{lane,side});
   else if((fx.k==="dmg"||fx.k==="destroy") && side===otherSide(S.active)) castTrick(S.sel,{lane,side});
+  else cancelSel();
 }
 function onHeroTap(side){
   if(uiLock||S.over||S.sel===null) return;
   const card=P(S.active).hand[S.sel];
   if(card && card.t==="t" && card.fx.k==="dmg" && side===otherSide(S.active)) castTrick(S.sel,{hero:side});
+  else cancelSel();
 }
 function playMinion(idx,lane){
   const card=P(S.active).hand[idx];
+  if(S.acted) S.acted[S.active]=true;
   P(S.active).res-=card.c;
   P(S.active).hand.splice(idx,1);
   const m={n:card.n,e:card.e,kw:card.kw,a:card.a,hp:card.h,maxHp:card.h};
@@ -476,11 +574,23 @@ function playMinion(idx,lane){
 }
 function castTrick(idx,target){
   const side=S.active, card=P(side).hand[idx], fx=card.fx;
+  if(S.acted) S.acted[side]=true;
   P(side).res-=card.c;
   P(side).hand.splice(idx,1);
   addLog(`${card.e}${card.n} cast`);
   S.sel=null;
   if(fx.k==="draw") draw(side,fx.n);
+  else if(fx.k==="heal"){
+    const p=P(side), healed=Math.min(20,p.hp+fx.n)-p.hp;
+    p.hp+=healed;
+    floaterAtEl($(heroBarId(side)),"+"+healed,"#7fe06d");
+  }
+  else if(fx.k==="aoe"){
+    const foe=otherSide(side);
+    for(let lane=0;lane<5;lane++){
+      if(S.lanes[lane][foe]) damageMinion(lane,foe,fx.n,{});
+    }
+  }
   else if(fx.k==="buff"){
     const m=S.lanes[target.lane][target.side];
     if(m){ m.a+=fx.a; m.hp+=fx.h; m.maxHp+=fx.h; floaterAtCell(target.lane,target.side,"+"+fx.a+"/+"+fx.h,"#7fe06d"); }
@@ -577,20 +687,22 @@ async function resolveLane(lane){
     if(pDied) S.lanes[lane].plant=null;
     render();
 
-    if(p.kw.includes("strike") && !S.over){
+    // corpse rule: a minion that died in the trade gets no Strikethrough or Frenzy follow-up —
+    // the bonus hits belong to survivors only
+    if(!pDied && p.kw.includes("strike") && !S.over){
       spawnPierceBeam(pRect,$(heroBarId("zombie")).getBoundingClientRect());
       heroDamage("zombie",p.a); addLog("⤳ Strikethrough hits hero!");
     }
-    if(z.kw.includes("strike") && !S.over){
+    if(!zDied && z.kw.includes("strike") && !S.over){
       spawnPierceBeam(zRect,$(heroBarId("plant")).getBoundingClientRect());
       heroDamage("plant",z.a); addLog("⤳ Strikethrough hits hero!");
     }
-    if(zDied && p.kw.includes("frenzy") && !S.over){
+    if(zDied && !pDied && p.kw.includes("frenzy") && !S.over){
       await sleep(300); addLog("🔥 Frenzy! Bonus hit on hero");
       spawnFrenzyArc(zRect,$(heroBarId("zombie")).getBoundingClientRect());
       heroDamage("zombie",p.a);
     }
-    if(pDied && z.kw.includes("frenzy") && !S.over){
+    if(pDied && !zDied && z.kw.includes("frenzy") && !S.over){
       await sleep(300); addLog("🔥 Frenzy! Bonus hit on hero");
       spawnFrenzyArc(pRect,$(heroBarId("plant")).getBoundingClientRect());
       heroDamage("plant",z.a);
@@ -685,7 +797,13 @@ function render(){
   $("pHand").textContent=P("plant").hand.length; $("pDeck").textContent=P("plant").deck.length;
 
   const phName={z1:"🎖️ Regime — play minions",p:"🌻 Plants — play cards",z2:"🎖️ Regime — play tricks",combat:"⚔️ Combat!"}[S.phase]||"—";
-  $("phaseBanner").textContent=`Turn ${S.turn} · ${phName}`;
+  const order=["z1","p","z2","combat"], curIdx=order.indexOf(S.phase);
+  const stepLabel={z1:"🎖️ Minions",p:"🌻 Plants",z2:"🎖️ Tricks",combat:"⚔️"};
+  $("phaseBanner").innerHTML =
+    `<div class="turnLabel">Turn ${S.turn} · ${phName}</div>`+
+    `<div class="phaseSteps">`+
+    order.map((ph,i)=>`<span class="step${i===curIdx?" now":i<curIdx?" done":""}">${stepLabel[ph]}</span>`).join(`<span class="arrow">›</span>`)+
+    `</div>`;
 
   const selCard=(S.sel!==null&&S.phase!=="combat")?P(S.active).hand[S.sel]:null;
   renderRow("zRow","zombie",selCard);
@@ -697,6 +815,8 @@ function render(){
 
   renderHand(selCard);
 
+  $("mullBtn").classList.toggle("hidden", !canMulligan());
+
   const btn=$("endBtn");
   if(S.phase==="combat"){ btn.textContent="⚔️ Fighting…"; btn.disabled=true; }
   else{
@@ -705,13 +825,14 @@ function render(){
   }
 
   if(selCard){
-    if(selCard.t==="m") hint("Tap a glowing lane to place it");
-    else if(selCard.fx.k==="dmg") hint("Tap an enemy minion or the enemy hero");
-    else if(selCard.fx.k==="buff") hint("Tap one of your minions");
-    else if(selCard.fx.k==="destroy") hint("Tap an enemy minion");
+    if(selCard.t==="m") hint("Tap a glowing lane to place it · tap elsewhere to cancel");
+    else if(selCard.fx.k==="dmg") hint("Tap an enemy minion or the enemy hero · tap elsewhere to cancel");
+    else if(selCard.fx.k==="buff") hint("Tap one of your minions · tap elsewhere to cancel");
+    else if(selCard.fx.k==="destroy") hint("Tap an enemy minion · tap elsewhere to cancel");
     else hint("Tap the card again to cast");
   } else if(S.phase==="combat") hint("Lanes fight left to right — minions trade simultaneously");
   else hint("Tap a card to play it, or end the phase");
+  saveGame();
 }
 function renderRow(elId,side,selCard){
   const row=$(elId); row.innerHTML="";
@@ -722,7 +843,9 @@ function renderRow(elId,side,selCard){
     const m=S.lanes[lane][side];
     if(m){
       cell.classList.add("hasMinion");
-      cell.innerHTML=`<div class="kwDot">${kwSymbols(m)}</div><div class="mEmoji">${m.e}</div><div class="mName">${m.n}</div><div class="mStats"><span class="a">⚔${m.a}</span><span class="h">❤${m.hp}</span></div>`;
+      const art=artFor(m.n);
+      const face = art ? `<img class="mArt" src="${art}" alt="${m.n}">` : `<div class="mEmoji">${m.e}</div>`;
+      cell.innerHTML=`<div class="kwDot">${kwSymbols(m)}</div>${face}<div class="mName">${m.n}</div><div class="mStats"><span class="a">⚔${m.a}</span><span class="h">❤${m.hp}</span></div>`;
       if(selCard&&selCard.t==="t"){
         const fx=selCard.fx;
         if(fx.k==="buff"&&side===S.active) cell.classList.add("validTarget");
@@ -739,7 +862,9 @@ function cardFaceMarkup(card){
   let desc = card.t==="m"
     ? [card.kw.map(k=>KWNAME[k]).join(" "),card.d].filter(Boolean).join(" · ")
     : card.d;
-  return `<div class="cost">${card.c}</div><div class="cEmoji">${card.e}</div><div class="cName">${card.n}</div><div class="cDesc">${desc||""}</div>`+
+  const art=artFor(card.n);
+  const artHtml = art ? `<img src="${art}" alt="${card.n}">` : `<span class="cEmoji">${card.e}</span>`;
+  return `<div class="cost"><span>${card.c}</span></div><div class="cArt">${artHtml}</div><div class="cName">${card.n}</div><div class="cDesc">${desc||""}</div>`+
     (card.t==="m" ? `<div class="cStats"><span class="a">⚔${card.a}</span><span class="h">❤${card.h}</span></div>` : `<div class="trickTag">✨ TRICK</div>`);
 }
 function renderHand(selCard){
@@ -791,7 +916,7 @@ function showHandoff(){
   $("readyBtn").onclick=()=>{ S.handoff=false; $("overlay").classList.add("hidden"); render(); };
 }
 function gameOver(winner){
-  S.over=true; uiLock=false;
+  S.over=true; uiLock=false; clearSave();
   const face=winner==="plant"?"🌻":"🎖️";
   const heading=winner==="plant"?"Plants win!":"The Regime wins!";
   const flavor=winner==="plant"?"The garden is safe.":"The Regime holds absolute power.";
@@ -807,12 +932,25 @@ function confirmNewGame(){
   $("cancelNewBtn").onclick=()=>{ $("overlay").classList.add("hidden"); render(); };
   $("confirmNewBtn").onclick=()=>{ $("overlay").classList.add("hidden"); newGame(); };
 }
+/* full battle log — the one-line bar only shows the last 2 events */
+function showLogHistory(){
+  if(uiLock) return;
+  const items = S && S.log.length
+    ? S.log.map(t=>`<p style="margin:3px 0;">${t}</p>`).join("")
+    : "<p>Nothing has happened yet.</p>";
+  $("overlayCard").innerHTML=`<h2>🗒 Battle Log</h2><div class="help" style="max-height:50vh;overflow-y:auto;">${items}</div><button id="closeLog">Close</button>`;
+  $("overlay").classList.remove("hidden");
+  $("closeLog").onclick=()=>{ $("overlay").classList.add("hidden"); render(); };
+}
 function showHelp(){
   $("overlayCard").innerHTML=`<h2>🌻 Garden Brawl 🎖️</h2><div class="help"><p><b>Goal:</b> knock the enemy hero from 20 HP to 0.</p>
   <p><b>Each turn:</b> both players draw 1 card and gain resources (☀️ sun for Plants, 📜 decrees for the Regime) equal to the turn number (max 10). Unspent resources are lost.</p>
   <p><b>Phase order:</b> 1) Regime plays minions → 2) Plants play everything → 3) Regime plays tricks → 4) Combat.</p>
   <p><b>Combat:</b> lanes resolve left to right. In each occupied lane both minions swing at the same time — it's a real trade, so both can deal damage and both can die. A minion hits the hero directly if its lane is open.</p>
-  <p><b>Keywords:</b><br>${Object.values(KWDESC).join("<br>")}</p>
+  <p><b>Keywords:</b><br>${Object.values(KWDESC).join("<br>")}<br><i>A minion that dies in the trade does NOT get its Strikethrough or Frenzy hit — survivors only.</i></p>
+  <p><b>Factions:</b> Plants are tougher and can heal. The Regime hits harder and has area damage.</p>
+  <p><b>Mulligan:</b> on turn 1, each player may redraw their whole hand once — before playing anything.</p>
+  <p><b>Tips:</b> tap the small log line to see the full battle history. A game in progress is saved automatically — if the page closes, use Resume on the home screen.</p>
   <p><b>Hotseat:</b> pass the phone at each phase-change screen so hands stay secret.</p></div><button id="closeHelp">Close</button>`;
   $("overlay").classList.remove("hidden");
   $("closeHelp").onclick=()=>{ $("overlay").classList.add("hidden"); render(); };
@@ -830,11 +968,16 @@ $("endBtn").onclick=endPhase;
 $("newBtn").onclick=confirmNewGame;
 $("hand").addEventListener("scroll",updateHandFade);
 $("helpBtn").onclick=showHelp;
+$("hintBar").onclick=cancelSel;
+$("logBar").onclick=showLogHistory;
+$("mullBtn").onclick=doMulligan;
 $("zombieBar").onclick=()=>onHeroTap("zombie");
 $("plantBar").onclick=()=>onHeroTap("plant");
 $("playBtn").onclick=()=>{ showScreen("app"); newGame(); };
+$("resumeBtn").onclick=resumeGame;
 $("compendiumBtn").onclick=()=>{ renderCompendium(); showScreen("compendiumScreen"); };
 $("compBackBtn").onclick=()=>showScreen("homeScreen");
+if(loadSave()) $("resumeBtn").classList.remove("hidden");
 showScreen("homeScreen");
 </script>
 </body>
