@@ -389,34 +389,48 @@ async function combat(){
   addLog("⚔️ Combat begins!");
   await sleep(500);
   for(let lane=0; lane<5 && !S.over; lane++){
-    for(const side of ["plant","zombie"]){
-      if(S.over) break;
-      const m=S.lanes[lane][side];
-      if(!m) continue;
-      await doAttack(lane,side);
-    }
+    await resolveLane(lane);
   }
   uiLock=false;
   if(!S.over){ await sleep(400); nextTurn(); }
 }
-async function doAttack(lane,side){
-  const m=S.lanes[lane][side];
-  if(!m||m.hp<=0) return;
-  const foe=otherSide(side);
-  const cell=$(`cell-${side}-${lane}`);
-  if(cell) cell.classList.add("attacking");
+/* Both minions in a lane swing at the same time, off the same stat snapshot —
+   a trade isn't decided by who goes first. Open lanes still hit the hero directly. */
+async function resolveLane(lane){
+  const p=S.lanes[lane].plant, z=S.lanes[lane].zombie;
+  if(!p && !z) return;
+  const pCell=$(`cell-plant-${lane}`), zCell=$(`cell-zombie-${lane}`);
+  if(pCell) pCell.classList.add("attacking");
+  if(zCell) zCell.classList.add("attacking");
   await sleep(420);
-  const blocker=S.lanes[lane][foe];
-  if(blocker){
-    addLog(`${m.e}${m.n} hits ${blocker.e}${blocker.n}`);
-    const killed=damageMinion(lane,foe,m.a,{attack:true,attacker:m});
-    if(m.kw.includes("strike")&&!S.over){ heroDamage(foe,m.a); addLog("⤳ Strikethrough hits hero!"); }
-    if(killed&&m.kw.includes("frenzy")&&!S.over){
-      await sleep(300); addLog("🔥 Frenzy! Bonus hit on hero"); heroDamage(foe,m.a);
-    }
-  } else {
-    heroDamage(foe,m.a);
-    if(!S.over) addLog(`${m.e}${m.n} hits hero for ${m.a}`);
+
+  if(p && z){
+    addLog(`${p.e}${p.n} clashes with ${z.e}${z.n}`);
+    let dmgToZ=p.a; if(z.kw.includes("armored")) dmgToZ=Math.max(0,dmgToZ-1);
+    let dmgToP=z.a; if(p.kw.includes("armored")) dmgToP=Math.max(0,dmgToP-1);
+    z.hp-=dmgToZ; p.hp-=dmgToP;
+    if(dmgToZ>0 && p.kw.includes("deadly")) z.hp=Math.min(z.hp,0);
+    if(dmgToP>0 && z.kw.includes("deadly")) p.hp=Math.min(p.hp,0);
+    floaterAtCell(lane,"zombie","-"+dmgToZ,"#ff6b6b");
+    floaterAtCell(lane,"plant","-"+dmgToP,"#ff6b6b");
+    render();
+    await sleep(300);
+
+    const zDied=z.hp<=0, pDied=p.hp<=0;
+    if(zDied){ addLog(`${z.e}${z.n} destroyed`); S.lanes[lane].zombie=null; }
+    if(pDied){ addLog(`${p.e}${p.n} destroyed`); S.lanes[lane].plant=null; }
+    render();
+
+    if(p.kw.includes("strike") && !S.over){ heroDamage("zombie",p.a); addLog("⤳ Strikethrough hits hero!"); }
+    if(z.kw.includes("strike") && !S.over){ heroDamage("plant",z.a); addLog("⤳ Strikethrough hits hero!"); }
+    if(zDied && p.kw.includes("frenzy") && !S.over){ await sleep(300); addLog("🔥 Frenzy! Bonus hit on hero"); heroDamage("zombie",p.a); }
+    if(pDied && z.kw.includes("frenzy") && !S.over){ await sleep(300); addLog("🔥 Frenzy! Bonus hit on hero"); heroDamage("plant",z.a); }
+  } else if(p){
+    heroDamage("zombie",p.a);
+    if(!S.over) addLog(`${p.e}${p.n} hits hero for ${p.a}`);
+  } else if(z){
+    heroDamage("plant",z.a);
+    if(!S.over) addLog(`${z.e}${z.n} hits hero for ${z.a}`);
   }
   await sleep(280);
 }
@@ -471,7 +485,7 @@ function render(){
     else if(selCard.fx.k==="buff") hint("Tap one of your minions");
     else if(selCard.fx.k==="destroy") hint("Tap an enemy minion");
     else hint("Tap the card again to cast");
-  } else if(S.phase==="combat") hint("Lanes fight left to right — plants strike first");
+  } else if(S.phase==="combat") hint("Lanes fight left to right — minions trade simultaneously");
   else hint("Tap a card to play it, or end the phase");
 }
 function renderRow(elId,side,selCard){
@@ -558,7 +572,7 @@ function showHelp(){
   $("overlayCard").innerHTML=`<h2>🌻 Garden Brawl 🧟</h2><div class="help"><p><b>Goal:</b> knock the enemy hero from 20 HP to 0.</p>
   <p><b>Each turn:</b> both players draw 1 card and get sun/brains equal to the turn number (max 10). Unspent resources are lost.</p>
   <p><b>Phase order:</b> 1) Zombies play minions → 2) Plants play everything → 3) Zombies play tricks → 4) Combat.</p>
-  <p><b>Combat:</b> lanes resolve left to right. In each lane the plant strikes first, then the zombie (if it survives). A minion hits the minion across from it, or the hero if the lane is open.</p>
+  <p><b>Combat:</b> lanes resolve left to right. In each occupied lane both minions swing at the same time — it's a real trade, so both can deal damage and both can die. A minion hits the hero directly if its lane is open.</p>
   <p><b>Keywords:</b><br>${Object.values(KWDESC).join("<br>")}</p>
   <p><b>Hotseat:</b> pass the phone at each phase-change screen so hands stay secret.</p></div><button id="closeHelp">Close</button>`;
   $("overlay").classList.remove("hidden");
