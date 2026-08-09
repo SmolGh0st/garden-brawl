@@ -69,6 +69,65 @@
   .cell.validSpot { border-color:#7fe06d; border-style:solid; box-shadow:0 0 8px #7fe06d55 inset; }
   .cell.validTarget { border-color:#ffd75e; border-style:solid; box-shadow:0 0 8px #ffd75e66 inset; }
   .cell.attacking { border-color:#ff8c42; box-shadow:0 0 14px #ff8c42aa; transform:scale(1.08); transition:all 0.15s; z-index:2; }
+
+  /* death: the losing minion shatters in place instead of instantly vanishing on the next render */
+  @keyframes shatterOut {
+    0% { transform:scale(1) rotate(0deg); opacity:1; }
+    25% { transform:scale(1.08) rotate(-2deg); }
+    100% { transform:scale(0.32) rotate(9deg); opacity:0; }
+  }
+  @keyframes shatterOutDeadly {
+    0% { transform:scale(1) rotate(0deg); opacity:1; filter:saturate(1) brightness(1); }
+    22% { transform:scale(1.12) rotate(-3deg); filter:saturate(1.8) brightness(1.3); }
+    100% { transform:scale(0.28) rotate(-11deg); opacity:0; filter:saturate(2.2) brightness(0.6); }
+  }
+  .cell.dying { animation:shatterOut 320ms cubic-bezier(0.4,0,1,1) forwards; z-index:3; pointer-events:none; }
+  .cell.dying.dyingDeadly { animation-name:shatterOutDeadly; animation-duration:360ms; }
+
+  /* impact sparks: land on the cell that took the hit, shaped by what the hit was */
+  @keyframes impactPop {
+    0% { transform:translate(-50%,-50%) scale(0.35); opacity:0; }
+    35% { opacity:1; }
+    100% { transform:translate(-50%,-50%) scale(1.5); opacity:0; }
+  }
+  @keyframes shieldRing {
+    0% { transform:translate(-50%,-50%) scale(0.4); opacity:0.95; }
+    100% { transform:translate(-50%,-50%) scale(1.7); opacity:0; }
+  }
+  .impactFx { position:fixed; z-index:60; pointer-events:none; width:44px; height:44px; border-radius:50%; }
+  .impactFx--normal { background:radial-gradient(circle, #fff6d0 0%, #ffd75e99 45%, transparent 72%); animation:impactPop 360ms cubic-bezier(0.16,1,0.3,1) forwards; }
+  .impactFx--deadly {
+    width:54px; height:54px;
+    background:radial-gradient(circle, #eaffe6 0%, #a366ffb0 42%, #2a0a3a66 72%, transparent 82%);
+    animation:impactPop 460ms cubic-bezier(0.16,1,0.3,1) forwards;
+  }
+  .impactFx--deadly::after {
+    content:"☠️"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-size:19px; filter:drop-shadow(0 0 4px #000);
+  }
+  .impactFx--armored { background:transparent; border:3px solid #8fd0ff; box-shadow:0 0 10px #8fd0ffaa; animation:shieldRing 380ms cubic-bezier(0.16,1,0.3,1) forwards; }
+
+  /* strikethrough: a beam literally passes through, from the attacking minion's cell to the hero bar */
+  @keyframes pierceGrow { 0%{ transform:scaleX(0); opacity:0; } 25%{ opacity:1; } 100%{ transform:scaleX(1); opacity:0; } }
+  .pierceBeamWrap { position:fixed; height:0; z-index:59; pointer-events:none; transform-origin:0 50%; }
+  .pierceBeam { position:absolute; left:0; top:-2px; height:4px; width:100%; border-radius:2px; transform-origin:0 50%;
+    background:linear-gradient(90deg,#ffb95e,#fff6d0 55%,transparent); box-shadow:0 0 8px #ffb95eaa;
+    animation:pierceGrow 380ms cubic-bezier(0.16,1,0.3,1) forwards; }
+
+  /* frenzy: a delayed, lobbed bonus hit — thrown, not a straight pass-through */
+  .frenzyArc { position:fixed; z-index:60; pointer-events:none; font-size:25px; filter:drop-shadow(0 0 6px #ff6a3dcc);
+    animation:frenzyArcMove 560ms cubic-bezier(0.3,0.6,0.3,1) forwards; }
+  @keyframes frenzyArcMove {
+    0% { transform:translate(0,0) scale(0.7) rotate(-10deg); opacity:0; }
+    14% { opacity:1; }
+    55% { transform:translate(var(--dxh),calc(var(--dyh) - 46px)) scale(1.15) rotate(8deg); }
+    100% { transform:translate(var(--dx),var(--dy)) scale(0.85) rotate(20deg); opacity:0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .impactFx, .pierceBeam, .frenzyArc, .cell.dying { animation-duration:1ms !important; }
+  }
+
   .cell .mEmoji { font-size:26px; line-height:1.1; }
   .cell .mName { font-size:8px; text-align:center; opacity:0.85; padding:0 2px; line-height:1.1; height:18px; overflow:hidden; }
   .cell .mStats { display:flex; gap:4px; font-size:11px; font-weight:700; }
@@ -406,29 +465,62 @@ async function resolveLane(lane){
 
   if(p && z){
     addLog(`${p.e}${p.n} clashes with ${z.e}${z.n}`);
-    let dmgToZ=p.a; if(z.kw.includes("armored")) dmgToZ=Math.max(0,dmgToZ-1);
-    let dmgToP=z.a; if(p.kw.includes("armored")) dmgToP=Math.max(0,dmgToP-1);
+    const zArmored=z.kw.includes("armored"), pArmored=p.kw.includes("armored");
+    let dmgToZ=p.a; if(zArmored) dmgToZ=Math.max(0,dmgToZ-1);
+    let dmgToP=z.a; if(pArmored) dmgToP=Math.max(0,dmgToP-1);
+    const zDeadlyKill = dmgToZ>0 && p.kw.includes("deadly");
+    const pDeadlyKill = dmgToP>0 && z.kw.includes("deadly");
     z.hp-=dmgToZ; p.hp-=dmgToP;
-    if(dmgToZ>0 && p.kw.includes("deadly")) z.hp=Math.min(z.hp,0);
-    if(dmgToP>0 && z.kw.includes("deadly")) p.hp=Math.min(p.hp,0);
-    floaterAtCell(lane,"zombie","-"+dmgToZ,"#ff6b6b");
-    floaterAtCell(lane,"plant","-"+dmgToP,"#ff6b6b");
+    if(zDeadlyKill) z.hp=Math.min(z.hp,0);
+    if(pDeadlyKill) p.hp=Math.min(p.hp,0);
+
+    const zVariant = zDeadlyKill ? "deadly" : (zArmored ? "armored" : "normal");
+    const pVariant = pDeadlyKill ? "deadly" : (pArmored ? "armored" : "normal");
+    spawnImpactFx(zCell,zVariant); spawnImpactFx(pCell,pVariant);
+    floaterAtCell(lane,"zombie",(zDeadlyKill?"☠":zArmored?"🛡":"")+"-"+dmgToZ, zDeadlyKill?"#c9a2ff":zArmored?"#8fd0ff":"#ff6b6b");
+    floaterAtCell(lane,"plant",(pDeadlyKill?"☠":pArmored?"🛡":"")+"-"+dmgToP, pDeadlyKill?"#c9a2ff":pArmored?"#8fd0ff":"#ff6b6b");
     render();
     await sleep(300);
 
+    // grab the freshly re-rendered cells (render() above replaced the DOM nodes) and lock in
+    // their positions now, before either one fades out, so beams/arcs can still target them.
+    const zCellNow=$(`cell-zombie-${lane}`), pCellNow=$(`cell-plant-${lane}`);
+    const zRect = zCellNow ? zCellNow.getBoundingClientRect() : null;
+    const pRect = pCellNow ? pCellNow.getBoundingClientRect() : null;
+
     const zDied=z.hp<=0, pDied=p.hp<=0;
-    if(zDied){ addLog(`${z.e}${z.n} destroyed`); S.lanes[lane].zombie=null; }
-    if(pDied){ addLog(`${p.e}${p.n} destroyed`); S.lanes[lane].plant=null; }
+    const deaths=[];
+    if(zDied){ addLog(`${z.e}${z.n} destroyed`); deaths.push(playDeath(zCellNow,zVariant)); }
+    if(pDied){ addLog(`${p.e}${p.n} destroyed`); deaths.push(playDeath(pCellNow,pVariant)); }
+    if(deaths.length) await Promise.all(deaths);
+    if(zDied) S.lanes[lane].zombie=null;
+    if(pDied) S.lanes[lane].plant=null;
     render();
 
-    if(p.kw.includes("strike") && !S.over){ heroDamage("zombie",p.a); addLog("⤳ Strikethrough hits hero!"); }
-    if(z.kw.includes("strike") && !S.over){ heroDamage("plant",z.a); addLog("⤳ Strikethrough hits hero!"); }
-    if(zDied && p.kw.includes("frenzy") && !S.over){ await sleep(300); addLog("🔥 Frenzy! Bonus hit on hero"); heroDamage("zombie",p.a); }
-    if(pDied && z.kw.includes("frenzy") && !S.over){ await sleep(300); addLog("🔥 Frenzy! Bonus hit on hero"); heroDamage("plant",z.a); }
+    if(p.kw.includes("strike") && !S.over){
+      spawnPierceBeam(pRect,$(heroBarId("zombie")).getBoundingClientRect());
+      heroDamage("zombie",p.a); addLog("⤳ Strikethrough hits hero!");
+    }
+    if(z.kw.includes("strike") && !S.over){
+      spawnPierceBeam(zRect,$(heroBarId("plant")).getBoundingClientRect());
+      heroDamage("plant",z.a); addLog("⤳ Strikethrough hits hero!");
+    }
+    if(zDied && p.kw.includes("frenzy") && !S.over){
+      await sleep(300); addLog("🔥 Frenzy! Bonus hit on hero");
+      spawnFrenzyArc(zRect,$(heroBarId("zombie")).getBoundingClientRect());
+      heroDamage("zombie",p.a);
+    }
+    if(pDied && z.kw.includes("frenzy") && !S.over){
+      await sleep(300); addLog("🔥 Frenzy! Bonus hit on hero");
+      spawnFrenzyArc(pRect,$(heroBarId("plant")).getBoundingClientRect());
+      heroDamage("plant",z.a);
+    }
   } else if(p){
+    spawnImpactFx($(heroBarId("zombie")),"normal");
     heroDamage("zombie",p.a);
     if(!S.over) addLog(`${p.e}${p.n} hits hero for ${p.a}`);
   } else if(z){
+    spawnImpactFx($(heroBarId("plant")),"normal");
     heroDamage("plant",z.a);
     if(!S.over) addLog(`${z.e}${z.n} hits hero for ${z.a}`);
   }
@@ -446,6 +538,59 @@ function floaterAtEl(el,text,color){
   setTimeout(()=>f.remove(),950);
 }
 function floaterAtCell(lane,side,text,color){ floaterAtEl($(`cell-${side}-${lane}`),text,color); }
+function heroBarId(side){ return side==="plant" ? "plantBar" : "zombieBar"; }
+
+/* ============ COMBAT FX ============ */
+function spawnImpactFx(el,variant){
+  if(!el) return;
+  const r=el.getBoundingClientRect();
+  const fx=document.createElement("div");
+  fx.className="impactFx impactFx--"+variant;
+  fx.style.left=(r.left+r.width/2)+"px";
+  fx.style.top=(r.top+r.height/2)+"px";
+  document.body.appendChild(fx);
+  setTimeout(()=>fx.remove(),620);
+}
+/* strikethrough: the beam originates at the attacker's own cell and lands on the enemy hero bar */
+function spawnPierceBeam(fromRect,toRect){
+  if(!fromRect||!toRect) return;
+  const x1=fromRect.left+fromRect.width/2, y1=fromRect.top+fromRect.height/2;
+  const x2=toRect.left+toRect.width/2, y2=toRect.top+toRect.height/2;
+  const dist=Math.hypot(x2-x1,y2-y1);
+  const angle=Math.atan2(y2-y1,x2-x1)*180/Math.PI;
+  const wrap=document.createElement("div");
+  wrap.className="pierceBeamWrap";
+  wrap.style.left=x1+"px"; wrap.style.top=y1+"px"; wrap.style.width=dist+"px";
+  wrap.style.transform=`rotate(${angle}deg)`;
+  const beam=document.createElement("div");
+  beam.className="pierceBeam";
+  wrap.appendChild(beam);
+  document.body.appendChild(wrap);
+  setTimeout(()=>wrap.remove(),420);
+}
+/* frenzy: a lobbed follow-up hit — thrown from where the kill happened, not a straight pass-through */
+function spawnFrenzyArc(fromRect,toRect){
+  if(!fromRect||!toRect) return;
+  const x1=fromRect.left+fromRect.width/2-13, y1=fromRect.top+fromRect.height/2-13;
+  const x2=toRect.left+toRect.width/2-13, y2=toRect.top+toRect.height/2-13;
+  const dx=x2-x1, dy=y2-y1;
+  const el=document.createElement("div");
+  el.className="frenzyArc"; el.textContent="🔥";
+  el.style.left=x1+"px"; el.style.top=y1+"px";
+  el.style.setProperty("--dx",dx+"px"); el.style.setProperty("--dy",dy+"px");
+  el.style.setProperty("--dxh",(dx/2)+"px"); el.style.setProperty("--dyh",(dy/2)+"px");
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),640);
+}
+/* the losing minion shatters in place; caller awaits before removing it from state so the exit is seen, not skipped */
+function playDeath(cellEl,variant){
+  return new Promise(resolve=>{
+    if(!cellEl){ resolve(); return; }
+    cellEl.classList.add("dying");
+    if(variant==="deadly") cellEl.classList.add("dyingDeadly");
+    setTimeout(resolve, variant==="deadly" ? 370 : 330);
+  });
+}
 
 /* ============ LOG / HINT ============ */
 function addLog(t){ S.log.push(t); $("logBar").textContent=S.log.slice(-2).join("  •  "); }
