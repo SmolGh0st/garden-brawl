@@ -250,7 +250,7 @@
 </head>
 <body data-active="zombie">
 <div id="homeScreen" class="screen">
-  <div class="homeFaces"><span>🌻</span><span>🧟</span></div>
+  <div class="homeFaces"><span>🌻</span><span>🎖️</span></div>
   <h1>Garden Brawl</h1>
   <p class="tagline">A lane battler for two — pass the phone and go head to head, hotseat style.</p>
   <div class="homeButtons">
@@ -267,17 +267,17 @@
   <div class="screenBody">
     <h3 class="compSectionTitle plantSection">🌻 Plants</h3>
     <div class="compGrid" id="compPlantGrid"></div>
-    <h3 class="compSectionTitle zombieSection">🧟 Zombies</h3>
+    <h3 class="compSectionTitle zombieSection">🎖️ Regime</h3>
     <div class="compGrid" id="compZombieGrid"></div>
   </div>
 </div>
 <div id="app" class="screen hidden">
   <div class="herobar" id="zombieBar">
-    <div class="face">🧟</div>
+    <div class="face">🎖️</div>
     <div class="stats">
-      <span style="font-weight:700;font-size:13px;">Dr. Rot</span>
+      <span style="font-weight:700;font-size:13px;">Generalissimo</span>
       <span class="pill hp">❤️ <span id="zHp">20</span></span>
-      <span class="pill res">🧠 <span id="zRes">0</span></span>
+      <span class="pill res">📜 <span id="zRes">0</span></span>
       <span class="pill">🃏 <span id="zHand">0</span></span>
       <span class="pill">📚 <span id="zDeck">0</span></span>
     </div>
@@ -329,32 +329,33 @@ const PLANT_POOL = [
   M("Deadly Shroom","🍄",2,1,1,["deadly"]),
   M("Thorn Lasher","🌵",2,3,1),
   M("Cabbage Lobber","🥬",3,2,4),
-  M("Pepper Sniper","🌶️",3,2,2,[],{k:"dmgLane",n:2},"When played: deal 2 dmg to the zombie in this lane"),
+  M("Pepper Sniper","🌶️",3,2,2,[],{k:"dmgLane",n:2},"When played: deal 2 dmg to the Regime unit in this lane"),
   M("Snap Trap","🌺",3,3,2,["frenzy"]),
   M("Melon Guard","🍈",4,3,5,["armored"]),
   M("Bamboo Skewer","🎋",4,4,2,["strike"]),
   M("Oak Titan","🌳",6,6,6),
   T("Grow Big","🌿",1,{k:"buff",a:2,h:2},"Give a plant +2/+2"),
-  T("Solar Flare","☀️",2,{k:"dmg",n:3},"Deal 3 damage to a zombie or the zombie hero"),
+  T("Solar Flare","☀️",2,{k:"dmg",n:3},"Deal 3 damage to a Regime minion or hero"),
   T("Photosynthesize","🍃",2,{k:"draw",n:2},"Draw 2 cards"),
-  T("Devour","🪴",5,{k:"destroy"},"Destroy a zombie minion")
+  T("Devour","🪴",5,{k:"destroy"},"Destroy a Regime minion")
 ];
+/* the "Regime" faction — a history / government-systems reskin, same stats and keywords as before */
 const ZOMBIE_POOL = [
-  M("Bone Chewer","🦴",1,1,2),
-  M("Shambler","🧟",1,2,1),
-  M("Grave Digger","⚰️",2,1,2,[],{k:"draw",n:1},"When played: draw a card"),
-  M("Cone Head","🚧",2,2,3),
-  M("Plague Rat","🐀",2,1,1,["deadly"]),
-  M("Brainy Prof","🧠",3,2,4),
-  M("Sludge Slinger","🤢",3,2,2,[],{k:"dmgLane",n:2},"When played: deal 2 dmg to the plant in this lane"),
-  M("Ravenous Ghoul","👹",3,3,2,["frenzy"]),
-  M("Bucket Guard","🪣",4,3,5,["armored"]),
-  M("Blitzer","🏈",4,4,2,["strike"]),
-  M("Colossus","🗿",6,6,6),
-  T("War Drum","🥁",1,{k:"buff",a:2,h:2},"Give a zombie +2/+2"),
-  T("Zap","⚡",2,{k:"dmg",n:3},"Deal 3 damage to a plant or the plant hero"),
-  T("Grave Robbing","🕳️",2,{k:"draw",n:2},"Draw 2 cards"),
-  T("Crush","🔨",5,{k:"destroy"},"Destroy a plant minion")
+  M("Foot Soldier","🪖",1,1,2),
+  M("Agitator","📢",1,2,1),
+  M("Bureaucrat","📋",2,1,2,[],{k:"draw",n:1},"When played: draw a card"),
+  M("Checkpoint Guard","🚧",2,2,3),
+  M("Informant","🐀",2,1,1,["deadly"]),
+  M("Propagandist","📻",3,2,4),
+  M("Saboteur","🧨",3,2,2,[],{k:"dmgLane",n:2},"When played: deal 2 dmg to the plant in this lane"),
+  M("Shock Trooper","💥",3,3,2,["frenzy"]),
+  M("Riot Police","👮",4,3,5,["armored"]),
+  M("Cavalry Charge","🐎",4,4,2,["strike"]),
+  M("Iron Curtain","🧱",6,6,6),
+  T("Communist Manifesto","📕",1,{k:"buff",a:2,h:2},"Give a Regime minion +2/+2"),
+  T("Blitzkrieg","⚡",2,{k:"dmg",n:3},"Deal 3 damage to a plant or the plant hero"),
+  T("Requisition","📦",2,{k:"draw",n:2},"Draw 2 cards"),
+  T("Show Trial","⚖️",5,{k:"destroy"},"Destroy a plant minion")
 ];
 /* ============ HELPERS ============ */
 const $ = id => document.getElementById(id);
@@ -363,7 +364,7 @@ const otherSide = s => s==="plant" ? "zombie" : "plant";
 let S = null;
 let uiLock = false;
 function P(s){ return S.players[s]; }
-function sideName(s){ return s==="plant" ? "🌻 Plants" : "🧟 Zombies"; }
+function sideName(s){ return s==="plant" ? "🌻 Plants" : "🎖️ Regime"; }
 function kwSymbols(m){ return m.kw.map(k=>({deadly:"☠️",armored:"🛡️",strike:"⤳",frenzy:"🔥"}[k])).join(""); }
 
 /* ============ GAME SETUP ============ */
@@ -428,7 +429,7 @@ function onCardTap(i){
   const card=P(S.active).hand[i];
   if(!card) return;
   if(!canPlayCard(card)){
-    if(card.c>P(S.active).res) hint("Not enough "+(S.active==="plant"?"sun ☀️":"brains 🧠"));
+    if(card.c>P(S.active).res) hint("Not enough "+(S.active==="plant"?"sun ☀️":"decrees 📜"));
     else if(S.phase==="z1"&&card.t==="t") hint("Tricks come later this turn");
     else if(S.phase==="z2"&&card.t==="m") hint("Tricks only in this phase");
     else hint("No valid target / no free lane");
@@ -683,7 +684,7 @@ function render(){
   $("pHp").textContent=P("plant").hp; $("pRes").textContent=P("plant").res;
   $("pHand").textContent=P("plant").hand.length; $("pDeck").textContent=P("plant").deck.length;
 
-  const phName={z1:"🧟 Zombies — play minions",p:"🌻 Plants — play cards",z2:"🧟 Zombies — play tricks",combat:"⚔️ Combat!"}[S.phase]||"—";
+  const phName={z1:"🎖️ Regime — play minions",p:"🌻 Plants — play cards",z2:"🎖️ Regime — play tricks",combat:"⚔️ Combat!"}[S.phase]||"—";
   $("phaseBanner").textContent=`Turn ${S.turn} · ${phName}`;
 
   const selCard=(S.sel!==null&&S.phase!=="combat")?P(S.active).hand[S.sel]:null;
@@ -700,7 +701,7 @@ function render(){
   if(S.phase==="combat"){ btn.textContent="⚔️ Fighting…"; btn.disabled=true; }
   else{
     btn.disabled=false;
-    btn.textContent={z1:"Done → Plants' turn",p:"Done → Zombie tricks",z2:"Start Combat ⚔️"}[S.phase]||"End Phase";
+    btn.textContent={z1:"Done → Plants' turn",p:"Done → Regime tricks",z2:"Start Combat ⚔️"}[S.phase]||"End Phase";
   }
 
   if(selCard){
@@ -781,8 +782,8 @@ function updateHandFade(){
 /* ============ OVERLAYS ============ */
 function showHandoff(){
   S.handoff=true;
-  const face=S.active==="zombie"?"🧟":"🌻";
-  const name=S.active==="zombie"?"Zombie player":"Plant player";
+  const face=S.active==="zombie"?"🎖️":"🌻";
+  const name=S.active==="zombie"?"Regime player":"Plant player";
   const pd={z1:"Play your minions (tricks come later)",p:"Play minions AND tricks",z2:"Tricks only — last chance before combat!"}[S.phase];
   const tip=(S.turn===1&&S.phase==="z1")?`<p style="font-size:11px;color:#8a967f;">First time? Tap ? for the rules. Pass the phone at each phase so hands stay secret.</p>`:"";
   $("overlayCard").innerHTML=`<div class="big">${face}</div><h2>Pass to ${name}</h2><p>Turn ${S.turn} — ${pd}</p>${tip}<button id="readyBtn">Ready!</button>`;
@@ -791,8 +792,10 @@ function showHandoff(){
 }
 function gameOver(winner){
   S.over=true; uiLock=false;
-  const face=winner==="plant"?"🌻":"🧟";
-  $("overlayCard").innerHTML=`<div class="big">${face}</div><h2>${winner==="plant"?"Plants":"Zombies"} win!</h2><p>The ${winner==="plant"?"garden is safe":"brains have been eaten"}. GG!</p><button id="againBtn">Play Again</button>`;
+  const face=winner==="plant"?"🌻":"🎖️";
+  const heading=winner==="plant"?"Plants win!":"The Regime wins!";
+  const flavor=winner==="plant"?"The garden is safe.":"The Regime holds absolute power.";
+  $("overlayCard").innerHTML=`<div class="big">${face}</div><h2>${heading}</h2><p>${flavor} GG!</p><button id="againBtn">Play Again</button>`;
   $("overlay").classList.remove("hidden");
   $("againBtn").onclick=()=>{ $("overlay").classList.add("hidden"); newGame(); };
   render();
@@ -805,9 +808,9 @@ function confirmNewGame(){
   $("confirmNewBtn").onclick=()=>{ $("overlay").classList.add("hidden"); newGame(); };
 }
 function showHelp(){
-  $("overlayCard").innerHTML=`<h2>🌻 Garden Brawl 🧟</h2><div class="help"><p><b>Goal:</b> knock the enemy hero from 20 HP to 0.</p>
-  <p><b>Each turn:</b> both players draw 1 card and get sun/brains equal to the turn number (max 10). Unspent resources are lost.</p>
-  <p><b>Phase order:</b> 1) Zombies play minions → 2) Plants play everything → 3) Zombies play tricks → 4) Combat.</p>
+  $("overlayCard").innerHTML=`<h2>🌻 Garden Brawl 🎖️</h2><div class="help"><p><b>Goal:</b> knock the enemy hero from 20 HP to 0.</p>
+  <p><b>Each turn:</b> both players draw 1 card and gain resources (☀️ sun for Plants, 📜 decrees for the Regime) equal to the turn number (max 10). Unspent resources are lost.</p>
+  <p><b>Phase order:</b> 1) Regime plays minions → 2) Plants play everything → 3) Regime plays tricks → 4) Combat.</p>
   <p><b>Combat:</b> lanes resolve left to right. In each occupied lane both minions swing at the same time — it's a real trade, so both can deal damage and both can die. A minion hits the hero directly if its lane is open.</p>
   <p><b>Keywords:</b><br>${Object.values(KWDESC).join("<br>")}</p>
   <p><b>Hotseat:</b> pass the phone at each phase-change screen so hands stay secret.</p></div><button id="closeHelp">Close</button>`;
