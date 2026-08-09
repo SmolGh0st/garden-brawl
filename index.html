@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Garden Brawl — Lane Battler</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; touch-action:manipulation; user-select:none; -webkit-user-select:none; }
+  html,body { height:100%; overflow:hidden; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: radial-gradient(ellipse at 50% 30%, #1c2a1e 0%, #10160f 70%);
+    color:#e8e6d8; display:flex; flex-direction:column;
+  }
+  #app { display:flex; flex-direction:column; height:100%; max-width:520px; margin:0 auto; width:100%; }
+
+  /* mouse affordance for desktop; harmless on touch */
+  .card, .cell, .herobar, button.btn { cursor:pointer; }
+
+  /* wider frame on desktop/laptop screens so it doesn't look like a stretched phone strip */
+  @media (min-width:700px){
+    html,body{ overflow:auto; }
+    body{ align-items:flex-start; justify-content:center; padding:24px 0; min-height:100%; }
+    #app{
+      max-width:640px; height:auto; min-height:calc(100vh - 48px);
+      border-radius:18px; border:1px solid #ffffff1c; box-shadow:0 24px 70px #000c;
+      overflow:hidden;
+    }
+    #board{ padding:14px 18px; gap:10px; }
+    .row{ gap:10px; }
+    .cell .mEmoji{ font-size:32px; }
+    .cell .mName{ font-size:9px; height:20px; }
+    .cell .mStats{ font-size:13px; }
+    .card{ flex:0 0 96px; height:132px; }
+    .card .cEmoji{ font-size:34px; }
+    .card .cName{ font-size:10px; }
+    .card .cDesc{ font-size:9px; }
+    .herobar .face{ font-size:32px; }
+    #hand{ padding:6px 4px 10px; }
+    #handWrap{ padding:6px 10px 12px; }
+  }
+
+  /* hero bars */
+  .herobar { display:flex; align-items:center; gap:8px; padding:6px 10px; }
+  .herobar .face { font-size:26px; }
+  .herobar .stats { display:flex; gap:6px; flex:1; align-items:center; flex-wrap:wrap; }
+  .pill { background:#00000055; border:1px solid #ffffff22; border-radius:12px; padding:2px 8px; font-size:12px; font-weight:600; }
+  .pill.hp { border-color:#e05555aa; }
+  .pill.res { border-color:#e0c14faa; }
+  .herobar.targetable { outline:2px solid #ffd75e; border-radius:10px; animation:pulse 0.8s infinite alternate; }
+  #zombieBar { background:linear-gradient(180deg,#2b1f33,#1d1526); border-bottom:1px solid #ffffff14; }
+  #plantBar  { background:linear-gradient(0deg,#1e3020,#152417); border-top:1px solid #ffffff14; }
+  @keyframes pulse { from{outline-color:#ffd75e55;} to{outline-color:#ffd75e;} }
+
+  /* phase banner */
+  #phaseBanner { text-align:center; font-size:11px; letter-spacing:1px; text-transform:uppercase; padding:3px; color:#c9c39b; background:#00000033; }
+
+  /* board */
+  #board { flex:1; display:flex; flex-direction:column; justify-content:center; gap:6px; padding:6px 8px; min-height:0; }
+  .row { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
+  .cell {
+    aspect-ratio:0.78; border-radius:9px; position:relative;
+    background:#ffffff08; border:1.5px dashed #ffffff1c;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+  }
+  .row.zrow .cell { background:#3a2b4a22; }
+  .row.prow .cell { background:#2b4a2b22; }
+  .cell.hasMinion { border-style:solid; border-color:#ffffff33; background:#00000055; }
+  .cell.validSpot { border-color:#7fe06d; border-style:solid; box-shadow:0 0 8px #7fe06d55 inset; }
+  .cell.validTarget { border-color:#ffd75e; border-style:solid; box-shadow:0 0 8px #ffd75e66 inset; }
+  .cell.attacking { border-color:#ff8c42; box-shadow:0 0 14px #ff8c42aa; transform:scale(1.08); transition:all 0.15s; z-index:2; }
+  .cell .mEmoji { font-size:26px; line-height:1.1; }
+  .cell .mName { font-size:8px; text-align:center; opacity:0.85; padding:0 2px; line-height:1.1; height:18px; overflow:hidden; }
+  .cell .mStats { display:flex; gap:4px; font-size:11px; font-weight:700; }
+  .cell .mStats .a { color:#ffb95e; } .cell .mStats .h { color:#7fe06d; }
+  .cell .kwDot { position:absolute; top:2px; right:3px; font-size:9px; }
+  .laneNums { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; text-align:center; font-size:9px; color:#ffffff44; }
+
+  /* floating damage */
+  .floater { position:fixed; font-size:20px; font-weight:800; pointer-events:none; z-index:50; animation:floatUp 0.9s forwards; text-shadow:0 1px 3px #000; }
+  @keyframes floatUp { from{opacity:1; transform:translateY(0);} to{opacity:0; transform:translateY(-34px);} }
+
+  /* hint + log */
+  #hintBar { padding:4px 10px; font-size:12px; min-height:22px; color:#ffd75e; text-align:center; }
+  #logBar { padding:2px 10px 4px; font-size:10px; color:#9aa88f; text-align:center; min-height:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  /* hand */
+  #handWrap { padding:4px 6px 8px; }
+  #hand { display:flex; gap:6px; overflow-x:auto; padding:4px 2px 6px; -webkit-overflow-scrolling:touch; }
+  /* edge fade is applied dynamically via JS (mask-image) when the hand scrolls off-screen */
+  .card {
+    flex:0 0 74px; height:104px; border-radius:9px; padding:4px 3px;
+    background:linear-gradient(180deg,#2a3626,#1b241a); border:1.5px solid #ffffff2e;
+    display:flex; flex-direction:column; align-items:center; position:relative;
+  }
+  body[data-active="zombie"] .card { background:linear-gradient(180deg,#332a40,#221a2c); }
+  .card.unplayable { opacity:0.42; }
+  .card.selected { border-color:#ffd75e; box-shadow:0 0 10px #ffd75e77; transform:translateY(-6px); }
+  .card .cost { position:absolute; top:-5px; left:-4px; background:#e0c14f; color:#1a1a10; width:19px; height:19px; border-radius:50%; font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px #000a; }
+  .card .cEmoji { font-size:26px; margin-top:6px; }
+  .card .cName { font-size:8.5px; font-weight:700; text-align:center; line-height:1.1; margin-top:2px; }
+  .card .cDesc { font-size:7.5px; text-align:center; color:#b8c4a8; line-height:1.15; margin-top:1px; flex:1; overflow:hidden; }
+  .card .cStats { font-size:10px; font-weight:800; display:flex; gap:6px; }
+  .card .cStats .a { color:#ffb95e; } .card .cStats .h { color:#7fe06d; }
+  .card .trickTag { font-size:7.5px; color:#c9a2ff; font-weight:700; }
+
+  /* controls */
+  #controls { display:flex; gap:8px; padding:0 10px 10px; align-items:center; }
+  button.btn {
+    flex:1; padding:11px; border-radius:10px; border:none; font-size:14px; font-weight:700;
+    background:linear-gradient(180deg,#5a8f4d,#3f6b35); color:#fff; box-shadow:0 2px 0 #2a4a24;
+  }
+  button.btn:active { transform:translateY(1px); }
+  button.btn.small { flex:0 0 auto; padding:11px 14px; background:linear-gradient(180deg,#555,#3a3a3a); box-shadow:0 2px 0 #2a2a2a; font-size:12px; }
+  body[data-active="zombie"] button.btn:not(.small) { background:linear-gradient(180deg,#7a5aa0,#5a3f7a); box-shadow:0 2px 0 #3d2a55; }
+
+  /* overlay */
+  #overlay {
+    position:fixed; inset:0; background:#0b0f0acc; backdrop-filter:blur(4px);
+    display:flex; align-items:center; justify-content:center; z-index:100; padding:24px;
+  }
+  #overlay.hidden { display:none; }
+  #overlayCard { background:#1c2418; border:1px solid #ffffff2a; border-radius:16px; padding:28px 22px; text-align:center; max-width:340px; width:100%; max-height:80vh; overflow-y:auto; }
+  #overlayCard .big { font-size:44px; }
+  #overlayCard h2 { font-size:19px; margin:8px 0 4px; }
+  #overlayCard p { font-size:13px; color:#b8c4a8; line-height:1.45; margin:6px 0; }
+  #overlayCard button { margin-top:14px; width:100%; padding:13px; border-radius:10px; border:none; font-size:15px; font-weight:700; background:linear-gradient(180deg,#5a8f4d,#3f6b35); color:#fff; }
+  #overlayCard .help { text-align:left; font-size:11.5px; }
+  #overlayCard .confirmRow { display:flex; gap:8px; margin-top:14px; }
+  #overlayCard .confirmRow button { flex:1; margin-top:0; }
+  #overlayCard button.secondary { background:linear-gradient(180deg,#555,#3a3a3a); }
+  #overlayCard button.danger { background:linear-gradient(180deg,#c0524f,#8a3a37); }
+</style>
+</head>
+<body data-active="zombie">
+<div id="app">
+  <div class="herobar" id="zombieBar">
+    <div class="face">🧟</div>
+    <div class="stats">
+      <span style="font-weight:700;font-size:13px;">Dr. Rot</span>
+      <span class="pill hp">❤️ <span id="zHp">20</span></span>
+      <span class="pill res">🧠 <span id="zRes">0</span></span>
+      <span class="pill">🃏 <span id="zHand">0</span></span>
+      <span class="pill">📚 <span id="zDeck">0</span></span>
+    </div>
+  </div>
+  <div id="phaseBanner">—</div>
+  <div id="board">
+    <div class="row zrow" id="zRow"></div>
+    <div class="laneNums"><span>Lane 1</span><span>Lane 2</span><span>Lane 3</span><span>Lane 4</span><span>Lane 5</span></div>
+    <div class="row prow" id="pRow"></div>
+  </div>
+  <div class="herobar" id="plantBar">
+    <div class="face">🌻</div>
+    <div class="stats">
+      <span style="font-weight:700;font-size:13px;">Captain Bloom</span>
+      <span class="pill hp">❤️ <span id="pHp">20</span></span>
+      <span class="pill res">☀️ <span id="pRes">0</span></span>
+      <span class="pill">🃏 <span id="pHand">0</span></span>
+      <span class="pill">📚 <span id="pDeck">0</span></span>
+    </div>
+  </div>
+  <div id="hintBar"></div>
+  <div id="logBar"></div>
+  <div id="handWrap"><div id="hand"></div></div>
+  <div id="controls">
+    <button class="btn small" id="helpBtn">?</button>
+    <button class="btn" id="endBtn">End Phase</button>
+    <button class="btn small" id="newBtn">New</button>
+  </div>
+</div>
+<div id="overlay" class="hidden"><div id="overlayCard"></div></div>
+
+<script>
+"use strict";
+/* ============ CARD DATA ============ */
+const KWNAME = { deadly:"☠️Deadly", armored:"🛡️Armored 1", strike:"⤳Strikethrough", frenzy:"🔥Frenzy" };
+const KWDESC = {
+  deadly:"☠️ Deadly: destroys any minion it damages",
+  armored:"🛡️ Armored 1: takes 1 less damage from attacks",
+  strike:"⤳ Strikethrough: attacks hit the minion AND the hero",
+  frenzy:"🔥 Frenzy: after killing a minion, attacks the hero too"
+};
+function M(n,e,c,a,h,kw,op,d){ return {t:"m",n,e,c,a,h,kw:kw||[],op:op||null,d:d||""}; }
+function T(n,e,c,fx,d){ return {t:"t",n,e,c,fx,d}; }
+
+const PLANT_POOL = [
+  M("Sprout Shooter","🌱",1,1,2),
+  M("Sunflower Sage","🌻",2,1,2,[],{k:"draw",n:1},"When played: draw a card"),
+  M("Nut Wall","🥜",2,0,6),
+  M("Deadly Shroom","🍄",2,1,1,["deadly"]),
+  M("Thorn Lasher","🌵",2,3,1),
+  M("Cabbage Lobber","🥬",3,2,4),
+  M("Pepper Sniper","🌶️",3,2,2,[],{k:"dmgLane",n:2},"When played: deal 2 dmg to the zombie in this lane"),
+  M("Snap Trap","🌺",3,3,2,["frenzy"]),
+  M("Melon Guard","🍈",4,3,5,["armored"]),
+  M("Bamboo Skewer","🎋",4,4,2,["strike"]),
+  M("Oak Titan","🌳",6,6,6),
+  T("Grow Big","🌿",1,{k:"buff",a:2,h:2},"Give a plant +2/+2"),
+  T("Solar Flare","☀️",2,{k:"dmg",n:3},"Deal 3 damage to a zombie or the zombie hero"),
+  T("Photosynthesize","🍃",2,{k:"draw",n:2},"Draw 2 cards"),
+  T("Devour","🪴",5,{k:"destroy"},"Destroy a zombie minion")
+];
+const ZOMBIE_POOL = [
+  M("Bone Chewer","🦴",1,1,2),
+  M("Shambler","🧟",1,2,1),
+  M("Grave Digger","⚰️",2,1,2,[],{k:"draw",n:1},"When played: draw a card"),
+  M("Cone Head","🚧",2,2,3),
+  M("Plague Rat","🐀",2,1,1,["deadly"]),
+  M("Brainy Prof","🧠",3,2,4),
+  M("Sludge Slinger","🤢",3,2,2,[],{k:"dmgLane",n:2},"When played: deal 2 dmg to the plant in this lane"),
+  M("Ravenous Ghoul","👹",3,3,2,["frenzy"]),
+  M("Bucket Guard","🪣",4,3,5,["armored"]),
+  M("Blitzer","🏈",4,4,2,["strike"]),
+  M("Colossus","🗿",6,6,6),
+  T("War Drum","🥁",1,{k:"buff",a:2,h:2},"Give a zombie +2/+2"),
+  T("Zap","⚡",2,{k:"dmg",n:3},"Deal 3 damage to a plant or the plant hero"),
+  T("Grave Robbing","🕳️",2,{k:"draw",n:2},"Draw 2 cards"),
+  T("Crush","🔨",5,{k:"destroy"},"Destroy a plant minion")
+];
+/* ============ HELPERS ============ */
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+const otherSide = s => s==="plant" ? "zombie" : "plant";
+let S = null;
+let uiLock = false;
+function P(s){ return S.players[s]; }
+function sideName(s){ return s==="plant" ? "🌻 Plants" : "🧟 Zombies"; }
+function kwSymbols(m){ return m.kw.map(k=>({deadly:"☠️",armored:"🛡️",strike:"⤳",frenzy:"🔥"}[k])).join(""); }
+
+/* ============ GAME SETUP ============ */
+function buildDeck(pool){
+  const deck=[];
+  pool.forEach(c=>{ deck.push({...c}); deck.push({...c}); });
+  for(let i=deck.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [deck[i],deck[j]]=[deck[j],deck[i]]; }
+  return deck;
+}
+function newGame(){
+  S = {
+    turn:0, phase:"idle", active:"zombie", over:false, sel:null, log:[],
+    lanes: Array.from({length:5},()=>({plant:null,zombie:null})),
+    players:{
+      plant:{hp:20,res:0,deck:buildDeck(PLANT_POOL),hand:[]},
+      zombie:{hp:20,res:0,deck:buildDeck(ZOMBIE_POOL),hand:[]}
+    }
+  };
+  draw("plant",4); draw("zombie",4);
+  nextTurn();
+}
+function draw(side,n){
+  for(let i=0;i<n;i++){
+    const p=P(side);
+    if(p.deck.length===0){ addLog(sideName(side)+" deck empty — no draw"); return; }
+    if(p.hand.length>=10){ p.deck.shift(); addLog(sideName(side)+" hand full — card burned"); continue; }
+    p.hand.push(p.deck.shift());
+  }
+}
+function nextTurn(){
+  S.turn++;
+  ["plant","zombie"].forEach(s=>{ P(s).res=Math.min(S.turn,10); draw(s,1); });
+  startPhase("z1");
+}
+function startPhase(ph){
+  S.phase=ph; S.sel=null;
+  S.active = ph==="p" ? "plant" : "zombie";
+  document.body.dataset.active=S.active;
+  showHandoff();
+  render();
+}
+function endPhase(){
+  if(uiLock||S.over||S.phase==="combat") return;
+  if(S.phase==="z1") startPhase("p");
+  else if(S.phase==="p") startPhase("z2");
+  else if(S.phase==="z2") combat();
+}
+
+/* ============ PLAYING CARDS ============ */
+function canPlayCard(card){
+  if(card.c > P(S.active).res) return false;
+  if(S.phase==="z1" && card.t!=="m") return false;
+  if(S.phase==="z2" && card.t!=="t") return false;
+  if(card.t==="m") return S.lanes.some(l=>!l[S.active]);
+  const fx=card.fx;
+  if(fx.k==="buff") return S.lanes.some(l=>l[S.active]);
+  if(fx.k==="destroy") return S.lanes.some(l=>l[otherSide(S.active)]);
+  return true; // dmg (hero always targetable), draw
+}
+function onCardTap(i){
+  if(uiLock||S.over||S.phase==="combat") return;
+  const card=P(S.active).hand[i];
+  if(!card) return;
+  if(!canPlayCard(card)){
+    if(card.c>P(S.active).res) hint("Not enough "+(S.active==="plant"?"sun ☀️":"brains 🧠"));
+    else if(S.phase==="z1"&&card.t==="t") hint("Tricks come later this turn");
+    else if(S.phase==="z2"&&card.t==="m") hint("Tricks only in this phase");
+    else hint("No valid target / no free lane");
+    return;
+  }
+  if(S.sel===i){
+    if(card.t==="t"&&card.fx.k==="draw"){ castTrick(i,null); return; }
+    S.sel=null; render(); return;
+  }
+  S.sel=i; render();
+}
+function onCellTap(lane,side){
+  if(uiLock||S.over||S.sel===null) return;
+  const card=P(S.active).hand[S.sel];
+  if(!card) return;
+  if(card.t==="m"){
+    if(side===S.active && !S.lanes[lane][S.active]) playMinion(S.sel,lane);
+    return;
+  }
+  const m=S.lanes[lane][side], fx=card.fx;
+  if(!m) return;
+  if(fx.k==="buff" && side===S.active) castTrick(S.sel,{lane,side});
+  else if((fx.k==="dmg"||fx.k==="destroy") && side===otherSide(S.active)) castTrick(S.sel,{lane,side});
+}
+function onHeroTap(side){
+  if(uiLock||S.over||S.sel===null) return;
+  const card=P(S.active).hand[S.sel];
+  if(card && card.t==="t" && card.fx.k==="dmg" && side===otherSide(S.active)) castTrick(S.sel,{hero:side});
+}
+function playMinion(idx,lane){
+  const card=P(S.active).hand[idx];
+  P(S.active).res-=card.c;
+  P(S.active).hand.splice(idx,1);
+  const m={n:card.n,e:card.e,kw:card.kw,a:card.a,hp:card.h,maxHp:card.h};
+  S.lanes[lane][S.active]=m;
+  addLog(`${card.e}${card.n} → lane ${lane+1}`);
+  S.sel=null; render();
+  if(card.op){
+    if(card.op.k==="draw") draw(S.active,card.op.n);
+    else if(card.op.k==="dmgLane" && S.lanes[lane][otherSide(S.active)])
+      damageMinion(lane,otherSide(S.active),card.op.n,{});
+  }
+  render();
+}
+function castTrick(idx,target){
+  const side=S.active, card=P(side).hand[idx], fx=card.fx;
+  P(side).res-=card.c;
+  P(side).hand.splice(idx,1);
+  addLog(`${card.e}${card.n} cast`);
+  S.sel=null;
+  if(fx.k==="draw") draw(side,fx.n);
+  else if(fx.k==="buff"){
+    const m=S.lanes[target.lane][target.side];
+    if(m){ m.a+=fx.a; m.hp+=fx.h; m.maxHp+=fx.h; floaterAtCell(target.lane,target.side,"+"+fx.a+"/+"+fx.h,"#7fe06d"); }
+  }
+  else if(fx.k==="dmg"){
+    if(target.hero) heroDamage(target.hero,fx.n);
+    else damageMinion(target.lane,target.side,fx.n,{});
+  }
+  else if(fx.k==="destroy"){
+    const m=S.lanes[target.lane][target.side];
+    if(m){ addLog(`${m.e}${m.n} destroyed!`); floaterAtCell(target.lane,target.side,"💥","#ff6b6b"); S.lanes[target.lane][target.side]=null; }
+  }
+  render();
+}
+
+/* ============ DAMAGE ============ */
+function damageMinion(lane,side,amt,opts){
+  const m=S.lanes[lane][side];
+  if(!m) return false;
+  let dmg=amt;
+  if(opts.attack && m.kw.includes("armored")) dmg=Math.max(0,dmg-1);
+  m.hp-=dmg;
+  floaterAtCell(lane,side,"-"+dmg,"#ff6b6b");
+  if(dmg>0 && opts.attacker && opts.attacker.kw.includes("deadly") && m.hp>0){
+    m.hp=0; addLog("☠️ Deadly!");
+  }
+  if(m.hp<=0){
+    S.lanes[lane][side]=null;
+    addLog(`${m.e}${m.n} destroyed`);
+    render(); return true;
+  }
+  render(); return false;
+}
+function heroDamage(side,amt){
+  P(side).hp-=amt;
+  const bar=$(side==="plant"?"plantBar":"zombieBar");
+  floaterAtEl(bar,"-"+amt,"#ff6b6b");
+  render();
+  if(P(side).hp<=0) gameOver(otherSide(side));
+}
+
+/* ============ COMBAT ============ */
+async function combat(){
+  S.phase="combat"; S.sel=null; uiLock=true; render();
+  addLog("⚔️ Combat begins!");
+  await sleep(500);
+  for(let lane=0; lane<5 && !S.over; lane++){
+    for(const side of ["plant","zombie"]){
+      if(S.over) break;
+      const m=S.lanes[lane][side];
+      if(!m) continue;
+      await doAttack(lane,side);
+    }
+  }
+  uiLock=false;
+  if(!S.over){ await sleep(400); nextTurn(); }
+}
+async function doAttack(lane,side){
+  const m=S.lanes[lane][side];
+  if(!m||m.hp<=0) return;
+  const foe=otherSide(side);
+  const cell=$(`cell-${side}-${lane}`);
+  if(cell) cell.classList.add("attacking");
+  await sleep(420);
+  const blocker=S.lanes[lane][foe];
+  if(blocker){
+    addLog(`${m.e}${m.n} hits ${blocker.e}${blocker.n}`);
+    const killed=damageMinion(lane,foe,m.a,{attack:true,attacker:m});
+    if(m.kw.includes("strike")&&!S.over){ heroDamage(foe,m.a); addLog("⤳ Strikethrough hits hero!"); }
+    if(killed&&m.kw.includes("frenzy")&&!S.over){
+      await sleep(300); addLog("🔥 Frenzy! Bonus hit on hero"); heroDamage(foe,m.a);
+    }
+  } else {
+    heroDamage(foe,m.a);
+    if(!S.over) addLog(`${m.e}${m.n} hits hero for ${m.a}`);
+  }
+  await sleep(280);
+}
+
+/* ============ FLOATERS ============ */
+function floaterAtEl(el,text,color){
+  if(!el) return;
+  const r=el.getBoundingClientRect();
+  const f=document.createElement("div");
+  f.className="floater"; f.textContent=text; f.style.color=color||"#fff";
+  f.style.left=(r.left+r.width/2-12)+"px"; f.style.top=(r.top+r.height/2-14)+"px";
+  document.body.appendChild(f);
+  setTimeout(()=>f.remove(),950);
+}
+function floaterAtCell(lane,side,text,color){ floaterAtEl($(`cell-${side}-${lane}`),text,color); }
+
+/* ============ LOG / HINT ============ */
+function addLog(t){ S.log.push(t); $("logBar").textContent=S.log.slice(-2).join("  •  "); }
+function hint(t){ $("hintBar").textContent=t; }
+
+/* ============ RENDER ============ */
+function render(){
+  if(!S) return;
+  $("zHp").textContent=P("zombie").hp; $("zRes").textContent=P("zombie").res;
+  $("zHand").textContent=P("zombie").hand.length; $("zDeck").textContent=P("zombie").deck.length;
+  $("pHp").textContent=P("plant").hp; $("pRes").textContent=P("plant").res;
+  $("pHand").textContent=P("plant").hand.length; $("pDeck").textContent=P("plant").deck.length;
+
+  const phName={z1:"🧟 Zombies — play minions",p:"🌻 Plants — play cards",z2:"🧟 Zombies — play tricks",combat:"⚔️ Combat!"}[S.phase]||"—";
+  $("phaseBanner").textContent=`Turn ${S.turn} · ${phName}`;
+
+  const selCard=(S.sel!==null&&S.phase!=="combat")?P(S.active).hand[S.sel]:null;
+  renderRow("zRow","zombie",selCard);
+  renderRow("pRow","plant",selCard);
+
+  const dmgSel=selCard&&selCard.t==="t"&&selCard.fx.k==="dmg";
+  $("zombieBar").classList.toggle("targetable",!!(dmgSel&&S.active==="plant"));
+  $("plantBar").classList.toggle("targetable",!!(dmgSel&&S.active==="zombie"));
+
+  renderHand(selCard);
+
+  const btn=$("endBtn");
+  if(S.phase==="combat"){ btn.textContent="⚔️ Fighting…"; btn.disabled=true; }
+  else{
+    btn.disabled=false;
+    btn.textContent={z1:"Done → Plants' turn",p:"Done → Zombie tricks",z2:"Start Combat ⚔️"}[S.phase]||"End Phase";
+  }
+
+  if(selCard){
+    if(selCard.t==="m") hint("Tap a glowing lane to place it");
+    else if(selCard.fx.k==="dmg") hint("Tap an enemy minion or the enemy hero");
+    else if(selCard.fx.k==="buff") hint("Tap one of your minions");
+    else if(selCard.fx.k==="destroy") hint("Tap an enemy minion");
+    else hint("Tap the card again to cast");
+  } else if(S.phase==="combat") hint("Lanes fight left to right — plants strike first");
+  else hint("Tap a card to play it, or end the phase");
+}
+function renderRow(elId,side,selCard){
+  const row=$(elId); row.innerHTML="";
+  for(let lane=0;lane<5;lane++){
+    const cell=document.createElement("div");
+    cell.className="cell"; cell.id=`cell-${side}-${lane}`;
+    cell.onclick=()=>onCellTap(lane,side);
+    const m=S.lanes[lane][side];
+    if(m){
+      cell.classList.add("hasMinion");
+      cell.innerHTML=`<div class="kwDot">${kwSymbols(m)}</div><div class="mEmoji">${m.e}</div><div class="mName">${m.n}</div><div class="mStats"><span class="a">⚔${m.a}</span><span class="h">❤${m.hp}</span></div>`;
+      if(selCard&&selCard.t==="t"){
+        const fx=selCard.fx;
+        if(fx.k==="buff"&&side===S.active) cell.classList.add("validTarget");
+        if((fx.k==="dmg"||fx.k==="destroy")&&side===otherSide(S.active)) cell.classList.add("validTarget");
+      }
+    } else if(selCard&&selCard.t==="m"&&side===S.active){
+      cell.classList.add("validSpot");
+    }
+    row.appendChild(cell);
+  }
+}
+function renderHand(selCard){
+  const handEl=$("hand"); handEl.innerHTML="";
+  if(S.phase==="combat"||S.over||S.handoff){ updateHandFade(); return; }
+  P(S.active).hand.forEach((card,i)=>{
+    const el=document.createElement("div");
+    el.className="card";
+    if(!canPlayCard(card)) el.classList.add("unplayable");
+    if(S.sel===i) el.classList.add("selected");
+    let desc = card.t==="m"
+      ? [card.kw.map(k=>KWNAME[k]).join(" "),card.d].filter(Boolean).join(" · ")
+      : card.d;
+    el.innerHTML=`<div class="cost">${card.c}</div><div class="cEmoji">${card.e}</div><div class="cName">${card.n}</div><div class="cDesc">${desc||""}</div>`+
+      (card.t==="m" ? `<div class="cStats"><span class="a">⚔${card.a}</span><span class="h">❤${card.h}</span></div>` : `<div class="trickTag">✨ TRICK</div>`);
+    el.onclick=()=>onCardTap(i);
+    handEl.appendChild(el);
+  });
+  updateHandFade();
+}
+/* edge-fade cue: tells the player there are more cards off-screen to scroll to */
+function updateHandFade(){
+  const hand=$("hand");
+  if(!hand) return;
+  const overflowing = hand.scrollWidth > hand.clientWidth + 2;
+  if(!overflowing){ hand.style.maskImage=""; hand.style.webkitMaskImage=""; return; }
+  const atStart = hand.scrollLeft <= 4;
+  const atEnd = hand.scrollLeft + hand.clientWidth >= hand.scrollWidth - 4;
+  const left = atStart ? "black 0" : "transparent 0, black 20px";
+  const right = atEnd ? "black 100%" : "black calc(100% - 20px), transparent 100%";
+  const grad = `linear-gradient(to right, ${left}, ${right})`;
+  hand.style.maskImage = grad;
+  hand.style.webkitMaskImage = grad;
+}
+
+/* ============ OVERLAYS ============ */
+function showHandoff(){
+  S.handoff=true;
+  const face=S.active==="zombie"?"🧟":"🌻";
+  const name=S.active==="zombie"?"Zombie player":"Plant player";
+  const pd={z1:"Play your minions (tricks come later)",p:"Play minions AND tricks",z2:"Tricks only — last chance before combat!"}[S.phase];
+  const tip=(S.turn===1&&S.phase==="z1")?`<p style="font-size:11px;color:#8a967f;">First time? Tap ? for the rules. Pass the phone at each phase so hands stay secret.</p>`:"";
+  $("overlayCard").innerHTML=`<div class="big">${face}</div><h2>Pass to ${name}</h2><p>Turn ${S.turn} — ${pd}</p>${tip}<button id="readyBtn">Ready!</button>`;
+  $("overlay").classList.remove("hidden");
+  $("readyBtn").onclick=()=>{ S.handoff=false; $("overlay").classList.add("hidden"); render(); };
+}
+function gameOver(winner){
+  S.over=true; uiLock=false;
+  const face=winner==="plant"?"🌻":"🧟";
+  $("overlayCard").innerHTML=`<div class="big">${face}</div><h2>${winner==="plant"?"Plants":"Zombies"} win!</h2><p>The ${winner==="plant"?"garden is safe":"brains have been eaten"}. GG!</p><button id="againBtn">Play Again</button>`;
+  $("overlay").classList.remove("hidden");
+  $("againBtn").onclick=()=>{ $("overlay").classList.add("hidden"); newGame(); };
+  render();
+}
+function confirmNewGame(){
+  if(uiLock){ hint("Wait for combat to finish first"); return; }
+  $("overlayCard").innerHTML=`<div class="big">⚠️</div><h2>Start a new game?</h2><p>This ends the current match for both players — no undo.</p><div class="confirmRow"><button id="cancelNewBtn" class="secondary">Cancel</button><button id="confirmNewBtn" class="danger">New Game</button></div>`;
+  $("overlay").classList.remove("hidden");
+  $("cancelNewBtn").onclick=()=>{ $("overlay").classList.add("hidden"); render(); };
+  $("confirmNewBtn").onclick=()=>{ $("overlay").classList.add("hidden"); newGame(); };
+}
+function showHelp(){
+  $("overlayCard").innerHTML=`<h2>🌻 Garden Brawl 🧟</h2><div class="help"><p><b>Goal:</b> knock the enemy hero from 20 HP to 0.</p>
+  <p><b>Each turn:</b> both players draw 1 card and get sun/brains equal to the turn number (max 10). Unspent resources are lost.</p>
+  <p><b>Phase order:</b> 1) Zombies play minions → 2) Plants play everything → 3) Zombies play tricks → 4) Combat.</p>
+  <p><b>Combat:</b> lanes resolve left to right. In each lane the plant strikes first, then the zombie (if it survives). A minion hits the minion across from it, or the hero if the lane is open.</p>
+  <p><b>Keywords:</b><br>${Object.values(KWDESC).join("<br>")}</p>
+  <p><b>Hotseat:</b> pass the phone at each phase-change screen so hands stay secret.</p></div><button id="closeHelp">Close</button>`;
+  $("overlay").classList.remove("hidden");
+  $("closeHelp").onclick=()=>{ $("overlay").classList.add("hidden"); render(); };
+}
+
+/* ============ WIRE UP ============ */
+$("endBtn").onclick=endPhase;
+$("newBtn").onclick=confirmNewGame;
+$("hand").addEventListener("scroll",updateHandFade);
+$("helpBtn").onclick=showHelp;
+$("zombieBar").onclick=()=>onHeroTap("zombie");
+$("plantBar").onclick=()=>onHeroTap("plant");
+newGame();
+</script>
+</body>
+</html>
