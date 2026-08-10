@@ -392,6 +392,47 @@
     user-select:text; -webkit-user-select:text;
   }
 
+  /* deck contents panel — always-visible "what's in this deck" list, separate from
+     the pool grid below it. DOM order is [deckContents, deckPoolArea]: on mobile
+     (column layout) that alone puts it on top; on desktop, flex-direction:row-reverse
+     flips the visual order without touching the DOM, putting it on the right as a
+     sticky side rail while the pool grid keeps its natural reading order. */
+  .deckEditorLayout { display:flex; flex-direction:column; gap:14px; }
+  .deckPoolArea { min-width:0; }
+  .deckContents {
+    background:#00000030; border:1px solid #ffffff1c; border-radius:12px; padding:10px 12px;
+  }
+  .dcTitle {
+    font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.4px; color:#e8e6d8;
+    display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;
+  }
+  .dcCount { font-size:11px; font-weight:700; color:#9aa88f; text-transform:none; letter-spacing:0; }
+  .dcEmpty { font-size:12px; color:#8a967f; margin:4px 0; }
+  .dcList { display:flex; flex-direction:column; gap:4px; max-height:220px; overflow-y:auto; }
+  .dcRow { display:flex; align-items:center; gap:8px; padding:5px 6px; border-radius:8px; background:#ffffff08; }
+  .dcRow.dcClickable { cursor:pointer; }
+  .dcRow.dcClickable:active { background:#ff6b6b22; }
+  .dcCost {
+    flex:0 0 auto; width:18px; height:18px; border-radius:5px;
+    background:linear-gradient(135deg,#f5dd7a,#c9a437); color:#221c07;
+    font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center;
+  }
+  .dcThumb {
+    flex:0 0 auto; width:22px; height:22px; border-radius:5px; overflow:hidden;
+    display:flex; align-items:center; justify-content:center; background:#00000040;
+  }
+  .dcThumb img { width:100%; height:100%; object-fit:cover; }
+  .dcEmoji { font-size:13px; }
+  .dcName { flex:1; min-width:0; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .dcQty { flex:0 0 auto; font-size:11px; font-weight:800; color:#ffd75e; }
+  @media (min-width:700px){
+    #deckScreen.screen{ max-width:900px; }
+    .deckEditorLayout { flex-direction:row-reverse; align-items:flex-start; gap:18px; }
+    .deckContents { flex:0 0 260px; position:sticky; top:0; max-height:calc(100vh - 90px); }
+    .dcList { max-height:calc(100vh - 170px); }
+    .deckPoolArea { flex:1; }
+  }
+
   /* scry picker */
   .scryHint { color:#8a967f; }
   .scryRow { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:10px; }
@@ -1610,6 +1651,30 @@ function renderDeckList(){
     `<p class="deckRules">Decks are exactly ${DECK_SIZE} cards, max ${MAX_COPIES} copies of any card. <span class="coreLegend"><span class="coreSwatch"></span>Core Set — you own 4 copies</span></p>`+
     section("plant","⚔️ Otherworld") + section("zombie","🎖️ Regime");
 }
+/* always-visible summary of what's actually in the deck right now — separate from
+   the full pool grid below it, so you don't have to hunt through 16 cards to see
+   your list. Sits at the top on mobile, in a sticky side rail on desktop (CSS). */
+function deckContentsHtml(side,deck,ro){
+  const entries = Object.entries(deck.cards)
+    .filter(([,c])=>c>0)
+    .map(([n,c])=>({n,c,card:ALL_CARDS[n]}))
+    .filter(e=>e.card)
+    .sort((a,b)=> a.card.c-b.card.c || a.n.localeCompare(b.n));
+  const total = entries.reduce((s,e)=>s+e.c,0);
+  const body = entries.length
+    ? `<div class="dcList">${entries.map(e=>{
+        const art=artFor(e.n);
+        const thumb=art ? `<img src="${art}" alt="">` : `<span class="dcEmoji">${e.card.e}</span>`;
+        return `<div class="dcRow${ro?'':' dcClickable'}" data-n="${escapeHtml(e.n)}"${ro?'':' title="Tap to remove one copy"'}>
+          <span class="dcCost">${e.card.c}</span>
+          <span class="dcThumb">${thumb}</span>
+          <span class="dcName">${escapeHtml(e.n)}</span>
+          <span class="dcQty">×${e.c}</span>
+        </div>`;
+      }).join("")}</div>`
+    : `<p class="dcEmpty">No cards yet — tap ＋ on a card below to add it.</p>`;
+  return `<div class="deckContents"><h4 class="dcTitle">Your Deck <span class="dcCount">${total}/${DECK_SIZE}</span></h4>${body}</div>`;
+}
 function renderDeckEditor(){
   const {side,id}=deckEd;
   const deck=getDeck(side,id);
@@ -1639,7 +1704,7 @@ function renderDeckEditor(){
       <div class="card${side==="zombie"?' zSide':''}${isCoreCard(c.n)?' coreCard':''}" data-name="${escapeHtml(c.n)}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}${n?`<div class="haveBadge">×${n}</div>`:""}</div>
       ${ctl}</div>`;
   }).join("");
-  $("deckBody").innerHTML=meta+`<div class="compGrid deckGrid">${grid}</div>`;
+  $("deckBody").innerHTML=`<div class="deckEditorLayout">${deckContentsHtml(side,deck,ro)}<div class="deckPoolArea">${meta}<div class="compGrid deckGrid">${grid}</div></div></div>`;
   if(ro){
     $("dCopyBtn").onclick=()=>duplicateDeck(side,deck,"My "+(side==="plant"?"Otherworld":"Regime")+" Deck");
   } else {
@@ -1718,6 +1783,8 @@ $("deckBody").addEventListener("click", e=>{
   const ctl=e.target.closest(".ctlBtn");
   if(ctl && !ctl.disabled && deckEd){ bumpCard(deckEd.side,deckEd.id,ctl.dataset.n,+ctl.dataset.d); return; }
   if(e.target.closest(".cardCtl")) return;
+  const dcRow=e.target.closest(".dcClickable");
+  if(dcRow && deckEd){ bumpCard(deckEd.side,deckEd.id,dcRow.dataset.n,-1); return; }
   const cardEl=e.target.closest(".card");
   if(cardEl){ const c=ALL_CARDS[cardEl.dataset.name]; if(c) zoomCard(c); return; }
   const nb=e.target.closest(".dNewBtn");
