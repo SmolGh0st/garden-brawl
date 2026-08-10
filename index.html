@@ -337,6 +337,8 @@
 
   /* deck builder */
   .deckRules { font-size:11px; color:#9aa88f; margin:0 0 12px; }
+  .coreLegend { display:inline-flex; align-items:center; gap:4px; margin-left:6px; }
+  .coreSwatch { width:12px; height:12px; border-radius:4px; background:#2f3d2a; box-shadow:0 0 0 2px #d4d4d4; display:inline-block; }
   .deckRow {
     display:flex; align-items:center; gap:10px; padding:11px 12px; margin-bottom:8px;
     background:#ffffff0a; border:1px solid #ffffff1c; border-radius:12px; cursor:pointer;
@@ -363,6 +365,13 @@
   .deckCardWrap.inDeck .card { opacity:1; border-color:#ffd75e88; }
   #deckScreen .card { background:linear-gradient(180deg,#2f3d2a,#182016); border-color:#8fbf7a4d; }
   #deckScreen .card.zSide { background:linear-gradient(180deg,#3a2f47,#201827); border-color:#c9a2ff42; }
+  /* Core Set marker: cards we own 4 full copies of, in browsing contexts (Compendium,
+     Deck Builder pool) — a light grey ring around the card. Uses an outset box-shadow
+     rather than border-color because several higher-specificity #id .card rules
+     (compendium/deck-builder faction tinting) would otherwise win the cascade and
+     silently swallow a plain border-color override. */
+  .card.coreCard { box-shadow:0 0 0 2px #d4d4d4, 0 2px 6px #0007, inset 0 1px 0 #ffffff14; }
+  .card.coreCard .cost { box-shadow:0 1px 3px #000c, inset 0 1px 0 #ffffff88, 0 0 0 1px #d4d4d4; }
   .haveBadge {
     position:absolute; bottom:-5px; right:-4px; z-index:2;
     background:#ffd75e; color:#221c07; font-size:10px; font-weight:800;
@@ -410,6 +419,7 @@
     <div class="spacer"></div>
   </div>
   <div class="screenBody">
+    <p class="deckRules"><span class="coreLegend"><span class="coreSwatch"></span>Core Set — you own 4 copies</span></p>
     <h3 class="compSectionTitle plantSection">⚔️ Otherworld</h3>
     <div class="compGrid" id="compPlantGrid"></div>
     <h3 class="compSectionTitle zombieSection">🎖️ Regime</h3>
@@ -573,6 +583,29 @@ const ZOMBIE_POOL = [
 /* lookup by name for the Compendium's zoomed-in card view */
 const ALL_CARDS = {};
 [...PLANT_POOL, ...ZOMBIE_POOL].forEach(c => { ALL_CARDS[c.n] = c; });
+
+/* CORE SET — the 32 cards that exist right now, which we own 4 full copies of.
+   Hardcoded as a frozen snapshot (NOT derived from PLANT_POOL/ZOMBIE_POOL) so that
+   any card added to the pools *after* this line automatically falls outside the
+   Core Set — future cards won't silently inherit the "own 4" marking just by
+   existing in the array. Cards get the light-grey ring wherever their face is
+   shown in a browsing context (Compendium, Deck Builder pool). Named "Core Set"
+   rather than "Starter" to avoid colliding with the existing Starter *Deck*
+   preset, which is an unrelated concept (a specific 40-card build, not ownership). */
+const CORE_SET = new Set([
+  "Squire","Wandering Bard","Stone Golem","Rogue","Goblin Raider","Dwarven Defender",
+  "Pyromancer","Berserker","Plate Knight","Ranger","Ancient Dragon",
+  "Blessing","Fireball","Divination","Lay on Hands","Banish",
+  "Foot Soldier","Agitator","Bureaucrat","Checkpoint Guard","Informant","Propagandist",
+  "Saboteur","Shock Trooper","Riot Police","Cavalry Charge","Iron Curtain",
+  "Communist Manifesto","Blitzkrieg","Requisition","Purge","Show Trial"
+]);
+function isCoreCard(name){ return CORE_SET.has(name); }
+const MAX_COPIES_OWNED = 4;
+/* how many of a card we own — everything in the Core Set is owned at the deck-build
+   cap (4); future non-core cards default to 0 until an unlock system exists. Used
+   today just to drive the visual marker; deckbuilding itself doesn't gate on it yet. */
+function ownedCopies(name){ return isCoreCard(name) ? MAX_COPIES_OWNED : 0; }
 
 /* ============ DECKS ============ */
 /* PvZ-Heroes-style deckbuilding: every deck is exactly 40 cards, max 4 copies of
@@ -1383,8 +1416,8 @@ function renderHand(selCard){
 let compendiumBuilt=false;
 function renderCompendium(){
   if(compendiumBuilt) return;
-  $("compPlantGrid").innerHTML = PLANT_POOL.map(c=>`<div class="card" data-name="${c.n}">${cardFaceMarkup(c)}</div>`).join("");
-  $("compZombieGrid").innerHTML = ZOMBIE_POOL.map(c=>`<div class="card zSide" data-name="${c.n}">${cardFaceMarkup(c)}</div>`).join("");
+  $("compPlantGrid").innerHTML = PLANT_POOL.map(c=>`<div class="card${isCoreCard(c.n)?' coreCard':''}" data-name="${c.n}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}</div>`).join("");
+  $("compZombieGrid").innerHTML = ZOMBIE_POOL.map(c=>`<div class="card zSide${isCoreCard(c.n)?' coreCard':''}" data-name="${c.n}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}</div>`).join("");
   compendiumBuilt=true;
 }
 /* zoomed-in card view: bigger art, full stats, and a flavor quote if one exists */
@@ -1574,7 +1607,7 @@ function renderDeckList(){
       <button class="btn dNewBtn" data-side="${side}">＋ New deck</button>`;
   };
   $("deckBody").innerHTML =
-    `<p class="deckRules">Decks are exactly ${DECK_SIZE} cards, max ${MAX_COPIES} copies of any card.</p>`+
+    `<p class="deckRules">Decks are exactly ${DECK_SIZE} cards, max ${MAX_COPIES} copies of any card. <span class="coreLegend"><span class="coreSwatch"></span>Core Set — you own 4 copies</span></p>`+
     section("plant","⚔️ Otherworld") + section("zombie","🎖️ Regime");
 }
 function renderDeckEditor(){
@@ -1603,7 +1636,7 @@ function renderDeckEditor(){
           <button class="ctlBtn" data-n="${escapeHtml(c.n)}" data-d="1"${(n>=MAX_COPIES||ct>=DECK_SIZE)?' disabled':''}>＋</button>
         </div>`;
     return `<div class="deckCardWrap${n?' inDeck':''}">
-      <div class="card${side==="zombie"?' zSide':''}" data-name="${escapeHtml(c.n)}">${cardFaceMarkup(c)}${n?`<div class="haveBadge">×${n}</div>`:""}</div>
+      <div class="card${side==="zombie"?' zSide':''}${isCoreCard(c.n)?' coreCard':''}" data-name="${escapeHtml(c.n)}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}${n?`<div class="haveBadge">×${n}</div>`:""}</div>
       ${ctl}</div>`;
   }).join("");
   $("deckBody").innerHTML=meta+`<div class="compGrid deckGrid">${grid}</div>`;
