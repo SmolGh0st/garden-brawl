@@ -255,7 +255,7 @@
   }
   button.btn:active { transform:translateY(1px); }
   button.btn.small { flex:0 0 auto; padding:11px 14px; min-width:46px; min-height:46px; background:linear-gradient(180deg,#555,#3a3a3a); box-shadow:0 2px 0 #2a2a2a; font-size:12px; }
-  body[data-active="zombie"] button.btn:not(.small) { background:linear-gradient(180deg,#7a5aa0,#5a3f7a); box-shadow:0 2px 0 #3d2a55; }
+  body[data-active="zombie"] button.btn:not(.small):not(.dNewBtn) { background:linear-gradient(180deg,#7a5aa0,#5a3f7a); box-shadow:0 2px 0 #3d2a55; }
 
   /* home screen */
   #homeScreen { align-items:center; justify-content:center; gap:20px; padding:32px 28px; text-align:center; }
@@ -271,15 +271,15 @@
   #homeScreen .homeBtn.primary { background:linear-gradient(180deg,#5a8f4d,#3f6b35); box-shadow:0 3px 0 #2a4a24, 0 10px 24px #0006; }
   #homeScreen .homeBtn.secondary { background:#ffffff12; border:1.5px solid #ffffff2e; box-shadow:none; color:#e8e6d8; }
 
-  /* compendium */
-  #compendiumScreen { height:100%; }
-  #compendiumScreen .screenHeader {
+  /* compendium + deck builder (shared screen chrome) */
+  #compendiumScreen, #deckScreen { height:100%; }
+  #compendiumScreen .screenHeader, #deckScreen .screenHeader {
     display:flex; align-items:center; justify-content:space-between; gap:10px;
     padding:10px 10px 9px; border-bottom:1px solid #ffffff14;
   }
-  #compendiumScreen .screenHeader h2 { font-size:14px; font-weight:800; letter-spacing:0.4px; text-transform:uppercase; color:#e8e6d8; }
-  #compendiumScreen .screenHeader .spacer { width:64px; }
-  #compendiumScreen .screenBody { flex:1; min-height:0; overflow-y:auto; padding:12px 12px 24px; -webkit-overflow-scrolling:touch; }
+  #compendiumScreen .screenHeader h2, #deckScreen .screenHeader h2 { font-size:14px; font-weight:800; letter-spacing:0.4px; text-transform:uppercase; color:#e8e6d8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #compendiumScreen .screenHeader .spacer, #deckScreen .screenHeader .spacer { width:64px; flex:0 0 auto; }
+  #compendiumScreen .screenBody, #deckScreen .screenBody { flex:1; min-height:0; overflow-y:auto; padding:12px 12px 24px; -webkit-overflow-scrolling:touch; }
   .compSectionTitle { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:#9ecf7f; margin:0 0 8px; }
   .compSectionTitle.zombieSection { color:#c9a2ff; margin-top:18px; }
   .compGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:8px; }
@@ -335,6 +335,54 @@
   #overlayCard button.secondary { background:linear-gradient(180deg,#555,#3a3a3a); }
   #overlayCard button.danger { background:linear-gradient(180deg,#c0524f,#8a3a37); }
 
+  /* deck builder */
+  .deckRules { font-size:11px; color:#9aa88f; margin:0 0 12px; }
+  .deckRow {
+    display:flex; align-items:center; gap:10px; padding:11px 12px; margin-bottom:8px;
+    background:#ffffff0a; border:1px solid #ffffff1c; border-radius:12px; cursor:pointer;
+  }
+  .deckRow:active { background:#ffffff14; }
+  .deckRow .dInfo { flex:1; text-align:left; min-width:0; }
+  .deckRow .dName { font-size:14px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .deckRow .dCount { font-size:11px; color:#9aa88f; margin-top:2px; }
+  .deckRow .dCount.bad { color:#ff9b9b; }
+  .deckRow .dGo { color:#ffffff44; font-size:20px; }
+  .dTag { font-size:9px; background:#ffd75e22; color:#ffd75e; border:1px solid #ffd75e55; border-radius:6px; padding:1px 5px; vertical-align:middle; }
+  button.dNewBtn {
+    width:100%; margin:2px 0 14px; padding:11px; border-radius:12px;
+    background:#ffffff0d; border:1.5px dashed #ffffff2e; box-shadow:none; color:#b8c4a8; font-size:13px;
+  }
+  .deckMeta { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+  .deckMeta .pill.ok { border-color:#7fe06daa; }
+  .deckMeta .pill.bad { border-color:#ff6b6baa; color:#ff9b9b; }
+  .deckActions { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+  .deckActions .btn.danger { background:linear-gradient(180deg,#c0524f,#8a3a37); box-shadow:0 2px 0 #5a2422; }
+  .deckCardWrap { display:flex; flex-direction:column; gap:4px; }
+  .deckCardWrap .card { flex:none; height:auto; min-height:118px; opacity:0.55; }
+  .deckCardWrap .card .cDesc { overflow:visible; }
+  .deckCardWrap.inDeck .card { opacity:1; border-color:#ffd75e88; }
+  #deckScreen .card { background:linear-gradient(180deg,#2f3d2a,#182016); border-color:#8fbf7a4d; }
+  #deckScreen .card.zSide { background:linear-gradient(180deg,#3a2f47,#201827); border-color:#c9a2ff42; }
+  .haveBadge {
+    position:absolute; bottom:-5px; right:-4px; z-index:2;
+    background:#ffd75e; color:#221c07; font-size:10px; font-weight:800;
+    border-radius:8px; padding:1px 6px; box-shadow:0 1px 3px #000c;
+  }
+  .cardCtl { display:flex; align-items:center; justify-content:center; gap:8px; min-height:32px; }
+  .ctlBtn { width:42px; height:32px; border-radius:8px; border:none; font-size:16px; font-weight:800; background:#ffffff18; color:#fff; cursor:pointer; }
+  .ctlBtn:active:not(:disabled) { background:#ffffff2e; }
+  .ctlBtn:disabled { opacity:0.28; }
+  .ctlCount { font-size:13px; font-weight:800; min-width:18px; text-align:center; }
+  .deckSelect {
+    width:100%; padding:11px; margin:4px 0 8px; border-radius:10px;
+    background:#10160f; color:#e8e6d8; border:1px solid #ffffff2e; font-size:14px;
+  }
+  .dInput {
+    width:100%; padding:11px; margin-top:10px; border-radius:10px;
+    background:#10160f; color:#e8e6d8; border:1px solid #ffffff2e; font-size:15px;
+    user-select:text; -webkit-user-select:text;
+  }
+
   /* scry picker */
   .scryHint { color:#8a967f; }
   .scryRow { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:10px; }
@@ -351,6 +399,7 @@
     <button class="homeBtn primary hidden" id="resumeBtn">⏯ Resume Game</button>
     <button class="homeBtn primary" id="aiBtn">🤖 Play vs AI</button>
     <button class="homeBtn primary" id="playBtn">👥 2 Players</button>
+    <button class="homeBtn secondary" id="decksBtn">🃏 Deck Builder</button>
     <button class="homeBtn secondary" id="compendiumBtn">📖 Compendium</button>
   </div>
 </div>
@@ -366,6 +415,14 @@
     <h3 class="compSectionTitle zombieSection">🎖️ Regime</h3>
     <div class="compGrid" id="compZombieGrid"></div>
   </div>
+</div>
+<div id="deckScreen" class="screen hidden">
+  <div class="screenHeader">
+    <button class="btn small" id="deckBackBtn">← Back</button>
+    <h2 id="deckTitle">Decks</h2>
+    <div class="spacer"></div>
+  </div>
+  <div class="screenBody" id="deckBody"></div>
 </div>
 <div id="app" class="screen hidden">
   <div class="herobar" id="zombieBar">
@@ -516,6 +573,48 @@ const ZOMBIE_POOL = [
 /* lookup by name for the Compendium's zoomed-in card view */
 const ALL_CARDS = {};
 [...PLANT_POOL, ...ZOMBIE_POOL].forEach(c => { ALL_CARDS[c.n] = c; });
+
+/* ============ DECKS ============ */
+/* PvZ-Heroes-style deckbuilding: every deck is exactly 40 cards, max 4 copies of
+   any one card, faction-locked. Decks are stored as name→count maps so future
+   card pool changes don't invalidate the storage format. The starter decks are
+   built-in (not stored, not editable) and always available. */
+const DECK_SIZE = 40, MAX_COPIES = 4;
+const STARTER_DECKS = {
+  /* curve-minded defaults from the current pool: 4x the cheap core, 2x the top end.
+     Cavalry Charge held at 2 on purpose — it's on the balance watchlist. */
+  plant: {
+    "Squire":4, "Wandering Bard":3, "Stone Golem":2, "Rogue":2, "Goblin Raider":3,
+    "Dwarven Defender":3, "Pyromancer":3, "Berserker":2, "Plate Knight":3, "Ranger":2,
+    "Ancient Dragon":2, "Blessing":3, "Fireball":3, "Divination":2, "Lay on Hands":2, "Banish":1
+  },
+  zombie: {
+    "Foot Soldier":4, "Agitator":3, "Bureaucrat":3, "Checkpoint Guard":2, "Informant":2,
+    "Propagandist":3, "Saboteur":3, "Shock Trooper":2, "Riot Police":3, "Cavalry Charge":2,
+    "Iron Curtain":2, "Communist Manifesto":3, "Blitzkrieg":3, "Requisition":2, "Purge":2, "Show Trial":1
+  }
+};
+const DECKS_KEY = "gardenBrawlDecks";
+function loadDecks(){
+  try{
+    const d = JSON.parse(localStorage.getItem(DECKS_KEY));
+    return (d && Array.isArray(d.plant) && Array.isArray(d.zombie)) ? d : {plant:[], zombie:[]};
+  }catch(e){ return {plant:[], zombie:[]}; }
+}
+let DECKS = loadDecks();
+function saveDecks(){ try{ localStorage.setItem(DECKS_KEY, JSON.stringify(DECKS)); }catch(e){} }
+function poolFor(side){ return side==="plant" ? PLANT_POOL : ZOMBIE_POOL; }
+function starterDeck(side){ return {id:"starter", name:"Starter Deck", cards:{...STARTER_DECKS[side]}, starter:true}; }
+function allDecks(side){ return [starterDeck(side), ...DECKS[side]]; }
+function getDeck(side,id){ return allDecks(side).find(d=>d.id===id) || starterDeck(side); }
+function deckCount(cards){ return Object.values(cards).reduce((a,b)=>a+b,0); }
+function deckValid(side,cards){
+  if(deckCount(cards)!==DECK_SIZE) return false;
+  return Object.entries(cards).every(([n,ct])=>
+    ct>=1 && ct<=MAX_COPIES && poolFor(side).some(c=>c.n===n));
+}
+function playableDecks(side){ return allDecks(side).filter(d=>deckValid(side,d.cards)); }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch])); }
 /* ============ HELPERS ============ */
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
@@ -565,20 +664,30 @@ function shuffle(arr){
   for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
   return arr;
 }
-function buildDeck(pool){
+function buildDeckFrom(side,cards){
   const deck=[];
-  pool.forEach(c=>{ deck.push({...c}); deck.push({...c}); });
+  Object.entries(cards).forEach(([n,ct])=>{
+    const c=ALL_CARDS[n]; if(!c) return;
+    for(let i=0;i<ct;i++) deck.push({...c});
+  });
   return shuffle(deck);
 }
-function newGame(mode,aiSide){
+function newGame(mode,aiSide,deckIds){
+  deckIds=deckIds||{};
+  const ids={ plant:deckIds.plant||"starter", zombie:deckIds.zombie||"starter" };
+  // fall back to the starter if a chosen deck was deleted or edited below 40 since
+  ["plant","zombie"].forEach(s=>{
+    const d=allDecks(s).find(x=>x.id===ids[s]);
+    if(!d || !deckValid(s,d.cards)) ids[s]="starter";
+  });
   S = {
-    mode:mode||"hotseat", aiSide:aiSide||null,
+    mode:mode||"hotseat", aiSide:aiSide||null, deckIds:ids,
     turn:0, phase:"idle", active:"zombie", over:false, sel:null, log:[],
     mull:{plant:true,zombie:true}, acted:{plant:false,zombie:false},
     lanes: Array.from({length:5},()=>({plant:null,zombie:null})),
     players:{
-      plant:{hp:20,res:0,deck:buildDeck(PLANT_POOL),hand:[]},
-      zombie:{hp:20,res:0,deck:buildDeck(ZOMBIE_POOL),hand:[]}
+      plant:{hp:20,res:0,deck:buildDeckFrom("plant",getDeck("plant",ids.plant).cards),hand:[]},
+      zombie:{hp:20,res:0,deck:buildDeckFrom("zombie",getDeck("zombie",ids.zombie).cards),hand:[]}
     }
   };
   draw("plant",4); draw("zombie",4);
@@ -1344,7 +1453,7 @@ function gameOver(winner){
   const flavor=winner==="plant"?"The story finds its hero.":"The Regime holds absolute power.";
   $("overlayCard").innerHTML=`<div class="big">${face}</div><h2>${heading}</h2><p>${flavor} GG!</p><div class="confirmRow"><button id="menuBtn" class="secondary">🏠 Main Menu</button><button id="againBtn">Play Again</button></div>`;
   $("overlay").classList.remove("hidden");
-  $("againBtn").onclick=()=>{ const m=S.mode,a=S.aiSide; $("overlay").classList.add("hidden"); newGame(m,a); };
+  $("againBtn").onclick=()=>{ const m=S.mode,a=S.aiSide,d=S.deckIds; $("overlay").classList.add("hidden"); newGame(m,a,d); };
   $("menuBtn").onclick=()=>{ $("overlay").classList.add("hidden"); S=null; showScreen("homeScreen"); };
   render();
 }
@@ -1362,7 +1471,7 @@ function confirmNewGame(){
   $("overlayCard").innerHTML=`<div class="big">⚠️</div><h2>Start a new game?</h2><p>This ends the current match for both players — no undo.</p><div class="confirmRow"><button id="cancelNewBtn" class="secondary">Cancel</button><button id="confirmNewBtn" class="danger">New Game</button></div>`;
   $("overlay").classList.remove("hidden");
   $("cancelNewBtn").onclick=()=>{ $("overlay").classList.add("hidden"); render(); };
-  $("confirmNewBtn").onclick=()=>{ const m=S?S.mode:"hotseat",a=S?S.aiSide:null; $("overlay").classList.add("hidden"); newGame(m,a); };
+  $("confirmNewBtn").onclick=()=>{ const m=S?S.mode:"hotseat",a=S?S.aiSide:null,d=S?S.deckIds:null; $("overlay").classList.add("hidden"); newGame(m,a,d); };
 }
 /* full battle log — the one-line bar only shows the last 2 events */
 function showLogHistory(){
@@ -1382,6 +1491,7 @@ function showHelp(){
   <p><b>Combat:</b> lanes resolve left to right. In each occupied lane both minions swing at the same time — it's a real trade, so both can deal damage and both can die. A minion hits the hero directly if its lane is open.</p>
   <p><b>Keywords:</b><br>${Object.values(KWDESC).join("<br>")}<br><i>A minion that dies in the trade does NOT get its Strikethrough or Frenzy hit — survivors only.</i></p>
   <p><b>Factions:</b> The Otherworld is tougher and can heal. The Regime hits harder and has area damage.</p>
+  <p><b>Decks:</b> every deck is exactly 40 cards with at most 4 copies of any card. Build your own in the 🃏 Deck Builder on the home screen and pick it when starting a game.</p>
   <p><b>Mulligan:</b> on turn 1, each player may redraw their whole hand once — before playing anything.</p>
   <p><b>Tips:</b> tap the small log line to see the full battle history. A game in progress is saved automatically — if the page closes, use Resume on the home screen.</p>
   <p><b>Hotseat:</b> pass the phone at each phase-change screen so hands stay secret.</p>
@@ -1396,14 +1506,158 @@ function showAiSidePicker(){
   <div class="confirmRow"><button id="pickPlant">🗡️ Otherworld</button><button id="pickZombie" style="background:linear-gradient(180deg,#7a5aa0,#5a3f7a);">🎖️ Regime</button></div>
   <button id="pickCancel" class="secondary">Cancel</button>`;
   $("overlay").classList.remove("hidden");
-  $("pickPlant").onclick=()=>{ $("overlay").classList.add("hidden"); showScreen("app"); newGame("ai","zombie"); };
-  $("pickZombie").onclick=()=>{ $("overlay").classList.add("hidden"); showScreen("app"); newGame("ai","plant"); };
+  $("pickPlant").onclick=()=>startAiGame("plant");
+  $("pickZombie").onclick=()=>startAiGame("zombie");
   $("pickCancel").onclick=()=>{ $("overlay").classList.add("hidden"); };
+}
+
+/* ============ DECK SELECTION AT GAME START ============ */
+/* If the only playable deck is the starter, skip the picker entirely — the flow
+   stays as fast as before deckbuilding existed. */
+function deckOptionsHtml(side,selId){
+  return `<select id="${selId}" class="deckSelect">`+
+    playableDecks(side).map(d=>`<option value="${d.id}">${escapeHtml(d.name)}</option>`).join("")+
+    `</select>`;
+}
+function startHotseat(){
+  if(playableDecks("plant").length<=1 && playableDecks("zombie").length<=1){
+    showScreen("app"); newGame("hotseat",null); return;
+  }
+  $("overlayCard").innerHTML=`<div class="big">👥</div><h2>Choose decks</h2>
+    <p style="margin-bottom:0;">⚔️ Otherworld deck</p>${deckOptionsHtml("plant","selPlantDeck")}
+    <p style="margin-bottom:0;">🎖️ Regime deck</p>${deckOptionsHtml("zombie","selZombieDeck")}
+    <div class="confirmRow"><button id="dsCancel" class="secondary">Cancel</button><button id="dsStart">Start!</button></div>`;
+  $("overlay").classList.remove("hidden");
+  $("dsCancel").onclick=()=>{ $("overlay").classList.add("hidden"); };
+  $("dsStart").onclick=()=>{
+    const ids={plant:$("selPlantDeck").value, zombie:$("selZombieDeck").value};
+    $("overlay").classList.add("hidden"); showScreen("app"); newGame("hotseat",null,ids);
+  };
+}
+function startAiGame(humanSide){
+  const aiSide=otherSide(humanSide);
+  if(playableDecks(humanSide).length<=1){
+    $("overlay").classList.add("hidden"); showScreen("app"); newGame("ai",aiSide); return;
+  }
+  $("overlayCard").innerHTML=`<div class="big">🃏</div><h2>Choose your deck</h2>
+    <p>The AI plays the ${aiSide==="plant"?"⚔️ Otherworld":"🎖️ Regime"} starter deck.</p>
+    ${deckOptionsHtml(humanSide,"selMyDeck")}
+    <div class="confirmRow"><button id="dsCancel" class="secondary">Cancel</button><button id="dsStart">Start!</button></div>`;
+  $("overlay").classList.remove("hidden");
+  $("dsCancel").onclick=()=>{ $("overlay").classList.add("hidden"); };
+  $("dsStart").onclick=()=>{
+    const ids={}; ids[humanSide]=$("selMyDeck").value;
+    $("overlay").classList.add("hidden"); showScreen("app"); newGame("ai",aiSide,ids);
+  };
+}
+
+/* ============ DECK BUILDER SCREEN ============ */
+/* Two views in one screen: the deck list (both factions, starter + customs) and
+   the editor (full faction pool with +/− copy counters). Edits autosave on every
+   tap; a deck only becomes playable at exactly 40 cards, but you can leave it
+   half-built and come back — it's just marked "not playable" until then. */
+let deckEd=null; // {side,id} while editing, null on the list view
+function newDeckId(){ return "d"+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function showDeckScreen(){ deckEd=null; renderDeckScreen(); showScreen("deckScreen"); }
+function renderDeckScreen(){ if(deckEd) renderDeckEditor(); else renderDeckList(); }
+function renderDeckList(){
+  $("deckTitle").textContent="Decks";
+  const section=(side,label)=>{
+    const rows=allDecks(side).map(d=>{
+      const ct=deckCount(d.cards), ok=deckValid(side,d.cards);
+      return `<div class="deckRow" data-side="${side}" data-id="${d.id}">
+        <div class="dInfo"><div class="dName">${escapeHtml(d.name)}${d.starter?' <span class="dTag">STARTER</span>':''}</div>
+        <div class="dCount${ok?'':' bad'}">${ct}/${DECK_SIZE} cards${ok?'':' — not playable yet'}</div></div>
+        <div class="dGo">›</div></div>`;
+    }).join("");
+    return `<h3 class="compSectionTitle${side==="zombie"?' zombieSection':''}">${label}</h3>${rows}
+      <button class="btn dNewBtn" data-side="${side}">＋ New deck</button>`;
+  };
+  $("deckBody").innerHTML =
+    `<p class="deckRules">Decks are exactly ${DECK_SIZE} cards, max ${MAX_COPIES} copies of any card.</p>`+
+    section("plant","⚔️ Otherworld") + section("zombie","🎖️ Regime");
+}
+function renderDeckEditor(){
+  const {side,id}=deckEd;
+  const deck=getDeck(side,id);
+  const ro=!!deck.starter;
+  const ct=deckCount(deck.cards);
+  let minions=0,tricks=0;
+  Object.entries(deck.cards).forEach(([n,c])=>{ if(ALL_CARDS[n]) (ALL_CARDS[n].t==="m"?minions+=c:tricks+=c); });
+  $("deckTitle").textContent=deck.name;
+  const meta=`<div class="deckMeta">
+      <span class="pill ${ct===DECK_SIZE?'ok':'bad'}">🃏 ${ct}/${DECK_SIZE}</span>
+      <span class="pill">⚔ ${minions} minions</span><span class="pill">✨ ${tricks} tricks</span>
+    </div>
+    <div class="deckActions">${ro
+      ? `<button class="btn small" id="dCopyBtn">📋 Copy to new deck</button><span class="dTag">Starter — view only</span>`
+      : `<button class="btn small" id="dRenameBtn">✏️ Rename</button><button class="btn small" id="dCopyBtn">📋 Duplicate</button><button class="btn small danger" id="dDelBtn">🗑 Delete</button>`}
+    </div>`;
+  const grid=poolFor(side).map(c=>{
+    const n=deck.cards[c.n]||0;
+    const ctl = ro
+      ? `<div class="cardCtl"><span class="ctlCount">×${n}</span></div>`
+      : `<div class="cardCtl">
+          <button class="ctlBtn" data-n="${escapeHtml(c.n)}" data-d="-1"${n===0?' disabled':''}>−</button>
+          <span class="ctlCount">${n}</span>
+          <button class="ctlBtn" data-n="${escapeHtml(c.n)}" data-d="1"${(n>=MAX_COPIES||ct>=DECK_SIZE)?' disabled':''}>＋</button>
+        </div>`;
+    return `<div class="deckCardWrap${n?' inDeck':''}">
+      <div class="card${side==="zombie"?' zSide':''}" data-name="${escapeHtml(c.n)}">${cardFaceMarkup(c)}${n?`<div class="haveBadge">×${n}</div>`:""}</div>
+      ${ctl}</div>`;
+  }).join("");
+  $("deckBody").innerHTML=meta+`<div class="compGrid deckGrid">${grid}</div>`;
+  if(ro){
+    $("dCopyBtn").onclick=()=>duplicateDeck(side,deck,"My "+(side==="plant"?"Otherworld":"Regime")+" Deck");
+  } else {
+    $("dRenameBtn").onclick=()=>renameDeckPrompt(side,id);
+    $("dCopyBtn").onclick=()=>duplicateDeck(side,deck,deck.name+" copy");
+    $("dDelBtn").onclick=()=>deleteDeckPrompt(side,id);
+  }
+}
+function bumpCard(side,id,name,d){
+  const deck=DECKS[side].find(x=>x.id===id); if(!deck) return;
+  const cur=deck.cards[name]||0, total=deckCount(deck.cards);
+  if(d>0 && (cur>=MAX_COPIES || total>=DECK_SIZE)) return;
+  const next=Math.max(0,cur+d);
+  if(next===0) delete deck.cards[name]; else deck.cards[name]=next;
+  saveDecks(); renderDeckEditor();
+}
+function duplicateDeck(side,src,name){
+  const d={id:newDeckId(), name, cards:{...src.cards}};
+  DECKS[side].push(d); saveDecks();
+  deckEd={side,id:d.id}; renderDeckEditor();
+}
+function renameDeckPrompt(side,id){
+  const deck=DECKS[side].find(x=>x.id===id); if(!deck) return;
+  $("overlayCard").innerHTML=`<h2>✏️ Rename deck</h2>
+    <input id="dNameInput" class="dInput" maxlength="24" value="${escapeHtml(deck.name)}">
+    <div class="confirmRow"><button id="rnCancel" class="secondary">Cancel</button><button id="rnOk">Save</button></div>`;
+  $("overlay").classList.remove("hidden");
+  const inp=$("dNameInput"); inp.focus(); inp.select();
+  $("rnCancel").onclick=()=>{ $("overlay").classList.add("hidden"); };
+  $("rnOk").onclick=()=>{
+    const v=inp.value.trim();
+    if(v) deck.name=v;
+    saveDecks(); $("overlay").classList.add("hidden"); renderDeckEditor();
+  };
+}
+function deleteDeckPrompt(side,id){
+  const deck=DECKS[side].find(x=>x.id===id); if(!deck) return;
+  $("overlayCard").innerHTML=`<div class="big">🗑</div><h2>Delete “${escapeHtml(deck.name)}”?</h2><p>No undo.</p>
+    <div class="confirmRow"><button id="delCancel" class="secondary">Cancel</button><button id="delOk" class="danger">Delete</button></div>`;
+  $("overlay").classList.remove("hidden");
+  $("delCancel").onclick=()=>{ $("overlay").classList.add("hidden"); };
+  $("delOk").onclick=()=>{
+    DECKS[side]=DECKS[side].filter(x=>x.id!==id);
+    saveDecks(); $("overlay").classList.add("hidden");
+    deckEd=null; renderDeckScreen();
+  };
 }
 
 /* ============ SCREENS ============ */
 function showScreen(id){
-  ["homeScreen","compendiumScreen","app"].forEach(sid=>{
+  ["homeScreen","compendiumScreen","deckScreen","app"].forEach(sid=>{
     $(sid).classList.toggle("hidden", sid!==id);
   });
 }
@@ -1419,8 +1673,31 @@ $("logBar").onclick=showLogHistory;
 $("mullBtn").onclick=doMulligan;
 $("zombieBar").onclick=()=>onHeroTap("zombie");
 $("plantBar").onclick=()=>onHeroTap("plant");
-$("playBtn").onclick=()=>{ showScreen("app"); newGame(); };
+$("playBtn").onclick=startHotseat;
 $("aiBtn").onclick=showAiSidePicker;
+$("decksBtn").onclick=showDeckScreen;
+$("deckBackBtn").onclick=()=>{
+  if(deckEd){ deckEd=null; renderDeckScreen(); }
+  else showScreen("homeScreen");
+};
+/* one delegated handler for the whole deck screen — it re-renders its innerHTML a lot */
+$("deckBody").addEventListener("click", e=>{
+  const ctl=e.target.closest(".ctlBtn");
+  if(ctl && !ctl.disabled && deckEd){ bumpCard(deckEd.side,deckEd.id,ctl.dataset.n,+ctl.dataset.d); return; }
+  if(e.target.closest(".cardCtl")) return;
+  const cardEl=e.target.closest(".card");
+  if(cardEl){ const c=ALL_CARDS[cardEl.dataset.name]; if(c) zoomCard(c); return; }
+  const nb=e.target.closest(".dNewBtn");
+  if(nb){
+    const side=nb.dataset.side;
+    const d={id:newDeckId(), name:"New Deck", cards:{}};
+    DECKS[side].push(d); saveDecks();
+    deckEd={side,id:d.id}; renderDeckEditor();
+    return;
+  }
+  const row=e.target.closest(".deckRow");
+  if(row){ deckEd={side:row.dataset.side, id:row.dataset.id}; renderDeckEditor(); }
+});
 $("resumeBtn").onclick=resumeGame;
 $("compendiumBtn").onclick=()=>{ renderCompendium(); showScreen("compendiumScreen"); };
 $("compendiumScreen").querySelector(".screenBody").addEventListener("click", e=>{
