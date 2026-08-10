@@ -339,10 +339,11 @@
 <div id="homeScreen" class="screen">
   <div class="homeFaces"><span>🗡️</span><span>🎖️</span></div>
   <h1>Garden Brawl</h1>
-  <p class="tagline">A lane battler for two — pass the phone and go head to head, hotseat style.</p>
+  <p class="tagline">A lane battler — play solo against the AI, or pass the phone and go head to head.</p>
   <div class="homeButtons">
     <button class="homeBtn primary hidden" id="resumeBtn">⏯ Resume Game</button>
-    <button class="homeBtn primary" id="playBtn">▶ Play</button>
+    <button class="homeBtn primary" id="aiBtn">🤖 Play vs AI</button>
+    <button class="homeBtn primary" id="playBtn">👥 2 Players</button>
     <button class="homeBtn secondary" id="compendiumBtn">📖 Compendium</button>
   </div>
 </div>
@@ -538,10 +539,18 @@ function resumeGame(){
   const s=loadSave();
   if(!s){ $("resumeBtn").classList.add("hidden"); return; }
   S=s; uiLock=false;
-  document.body.dataset.active=S.active;
   showScreen("app");
-  showHandoff(); // re-show the pass screen so nobody's hand is exposed on resume
-  render();
+  if(isAiGame()){
+    // solo game: no pass screen needed; if the save landed mid-AI-turn, restart the AI's phase
+    document.body.dataset.active=otherSide(S.aiSide);
+    S.handoff=false;
+    render();
+    if(S.active===S.aiSide && !S.over) aiPhase();
+  } else {
+    document.body.dataset.active=S.active;
+    showHandoff(); // re-show the pass screen so nobody's hand is exposed on resume
+    render();
+  }
 }
 
 /* ============ GAME SETUP ============ */
@@ -554,8 +563,9 @@ function buildDeck(pool){
   pool.forEach(c=>{ deck.push({...c}); deck.push({...c}); });
   return shuffle(deck);
 }
-function newGame(){
+function newGame(mode,aiSide){
   S = {
+    mode:mode||"hotseat", aiSide:aiSide||null,
     turn:0, phase:"idle", active:"zombie", over:false, sel:null, log:[],
     mull:{plant:true,zombie:true}, acted:{plant:false,zombie:false},
     lanes: Array.from({length:5},()=>({plant:null,zombie:null})),
@@ -583,10 +593,21 @@ function nextTurn(){
 function startPhase(ph){
   S.phase=ph; S.sel=null;
   S.active = ph==="p" ? "plant" : "zombie";
-  document.body.dataset.active=S.active;
-  showHandoff();
-  render();
+  // solo mode: the human's side stays at the bottom the whole game — no board flipping,
+  // no pass-the-phone screens; the AI's phases run themselves
+  if(isAiGame()){
+    S.handoff=false;
+    document.body.dataset.active=otherSide(S.aiSide);
+    render();
+    if(S.active===S.aiSide && !S.over) aiPhase();
+  } else {
+    document.body.dataset.active=S.active;
+    showHandoff();
+    render();
+  }
 }
+function isAiGame(){ return S && S.mode==="ai"; }
+function isAiTurn(){ return isAiGame() && S.active===S.aiSide; }
 function endPhase(){
   if(uiLock||S.over||S.phase==="combat") return;
   if(S.phase==="z1") startPhase("p");
@@ -744,8 +765,28 @@ function startScry(side,n){
     render();
     return;
   }
+  // the AI resolves its own scries silently — no modal, just a quick heuristic pick
+  if(isAiGame() && side===S.aiSide){
+    let best=0;
+    for(let i=1;i<revealed.length;i++) if(aiScryValue(revealed[i])>aiScryValue(revealed[best])) best=i;
+    const chosen=revealed[best], rest=revealed.filter((_,i)=>i!==best);
+    if(p.hand.length>=10){ addLog(sideName(side)+" hand full — "+chosen.n+" burned"); }
+    else p.hand.push(chosen);
+    p.deck.push(...rest); shuffle(p.deck);
+    addLog(`${sideName(side)} scried, kept ${chosen.e}${chosen.n}`);
+    render();
+    return;
+  }
   uiLock=true; render();
   showScryPicker(side,revealed);
+}
+/* prefer cards the AI can realistically cast soon, weighted by raw size */
+function aiScryValue(card){
+  const res=P(S.aiSide).res;
+  let v=card.c + (card.t==="m" ? (card.a+card.h)*0.3 : 1);
+  if(card.c<=res) v+=2;             // castable this very turn
+  else if(card.c<=Math.min(S.turn+1,10)) v+=1; // castable next turn
+  return v;
 }
 function showScryPicker(side,revealed){
   const oc=$("overlayCard");
@@ -770,6 +811,161 @@ function resolveScry(side,revealed,chosenIdx){
   $("overlay").classList.add("hidden");
   uiLock=false;
   render();
+}
+
+/* ============ AI OPPONENT ============ */
+/* One brain for either faction. It reuses the human code paths (playMinion / castTrick /
+   startScry), so every rule, animation and log line behaves identically — it just picks
+   the moves itself, with short pauses so the player can watch what it does.
+   Deliberately basic heuristics for now; tune freely later. */
+async function aiPhase(){
+  uiLock=true; render();
+  await sleep(700);
+  aiMaybeMulligan();
+  if(S.phase==="z1") await aiPlayMinions();
+  else if(S.phase==="z2") await aiPlayTricks();
+  else if(S.phase==="p"){ await aiPlayMinions(); await aiPlayTricks(); }
+  uiLock=false;
+  if(S.over){ render(); return; }
+  await sleep(450);
+  endPhase();
+}
+/* turn-1 redraw if the hand is clunky: wants 2+ cheap cards and at least one early minion */
+function aiMaybeMulligan(){
+  if(!canMulligan()) return;
+  const hand=P(S.aiSide).hand;
+  const cheap=hand.filter(c=>c.c<=2).length;
+  const earlyMinions=hand.filter(c=>c.t==="m"&&c.c<=3).length;
+  if(cheap>=2 && earlyMinions>=1) return;
+  const p=P(S.aiSide), n=p.hand.length;
+  p.deck.push(...p.hand.splice(0));
+  shuffle(p.deck);
+  draw(S.aiSide,n);
+  S.mull[S.aiSide]=false;
+  addLog(`${sideName(S.aiSide)} mulligans (${n} cards)`);
+  render();
+}
+/* attack math incl. armor + deadly — used to judge trades before making them */
+function aiTradeMath(atk,def){
+  let out=atk.a;
+  if(def.kw.includes("armored")) out=Math.max(0,out-1);
+  const kills = out>0 && (out>=def.hp || atk.kw.includes("deadly"));
+  return {out,kills};
+}
+function scoreMinionPlacement(card,lane){
+  const foeSide=otherSide(S.aiSide);
+  const foe=S.lanes[lane][foeSide];
+  let score=card.a + card.h*0.5;                       // base body value
+  if(card.op&&card.op.k==="draw") score+=1;
+  if(card.op&&card.op.k==="scry") score+=0.5;
+  if(foe){
+    let foeHp=foe.hp;
+    if(card.op&&card.op.k==="dmgLane"){                // on-play ping softens the defender first
+      foeHp=Math.max(0,foeHp-card.op.n);
+      if(foeHp===0) score+=foe.a+2;                    // ping alone kills it
+    }
+    const give=aiTradeMath({a:card.a,kw:card.kw},{a:foe.a,kw:foe.kw,hp:foeHp});
+    const take=aiTradeMath(foe,{kw:card.kw,hp:card.h});
+    score += foe.a;                                    // blocking incoming face damage
+    if(foeHp>0){
+      if(give.kills) score += foe.a + foeHp*0.4 + 2;
+      if(take.kills) score -= card.a + card.h*0.4 + 1;
+      if(give.kills && !take.kills) score += 2;        // clean win
+      if(!give.kills && take.kills) score -= 3;        // pure chump
+    }
+  } else {
+    score += Math.min(card.a,4)*0.4;                   // open lane = face pressure
+    if(card.kw.includes("strike")) score += 0.5;
+    if(card.op&&card.op.k==="dmgLane") score -= 1;     // wasted on-play ping
+  }
+  return score;
+}
+async function aiPlayMinions(){
+  for(let guard=0; guard<10 && !S.over; guard++){
+    const p=P(S.aiSide);
+    let best=null;
+    p.hand.forEach((card,i)=>{
+      if(card.t!=="m"||card.c>p.res) return;
+      for(let lane=0;lane<5;lane++){
+        if(S.lanes[lane][S.aiSide]) continue;
+        const sc=scoreMinionPlacement(card,lane)+card.c*0.15; // slight bias toward bigger plays
+        if(!best||sc>best.sc) best={i,lane,sc};
+      }
+    });
+    if(!best) return;
+    playMinion(best.i,best.lane);
+    await sleep(650);
+  }
+}
+/* pick the single best trick play right now, or null. Score >= 1 to bother. */
+function aiChooseTrick(){
+  const me=S.aiSide, foeSide=otherSide(me), p=P(me), foeP=P(foeSide);
+  let best=null;
+  const consider=(i,target,sc)=>{ if(sc>=1 && (!best||sc>best.sc)) best={i,target,sc}; };
+  p.hand.forEach((card,i)=>{
+    if(card.t!=="t"||card.c>p.res) return;
+    const fx=card.fx;
+    if(fx.k==="dmg"){
+      if(foeP.hp<=fx.n){ consider(i,{hero:foeSide},1000); return; }  // lethal — nothing else matters
+      let bk=null;
+      for(let l=0;l<5;l++){
+        const m=S.lanes[l][foeSide];
+        if(m&&m.hp<=fx.n){ const v=m.a+m.hp*0.4+2; if(!bk||v>bk.v) bk={l,v}; }
+      }
+      if(bk) consider(i,{lane:bk.l,side:foeSide},bk.v);              // best clean kill
+      else if(foeP.hp<=8) consider(i,{hero:foeSide},1.5);            // keep a low hero honest
+    }
+    else if(fx.k==="destroy"){
+      let bt=null;
+      for(let l=0;l<5;l++){
+        const m=S.lanes[l][foeSide];
+        if(m){ const v=m.a+m.hp; if(!bt||v>bt.v) bt={l,v}; }
+      }
+      if(bt && bt.v>=7) consider(i,{lane:bt.l,side:foeSide},bt.v-3); // only worth it on real threats
+    }
+    else if(fx.k==="buff"){
+      let bb=null;
+      for(let l=0;l<5;l++){
+        const m=S.lanes[l][me]; if(!m) continue;
+        const foe=S.lanes[l][foeSide];
+        let v=0.5;
+        if(foe){
+          const before=aiTradeMath({a:m.a,kw:m.kw},foe);
+          const after=aiTradeMath({a:m.a+fx.a,kw:m.kw},foe);
+          const diesBefore=aiTradeMath(foe,{kw:m.kw,hp:m.hp}).kills;
+          const diesAfter=aiTradeMath(foe,{kw:m.kw,hp:m.hp+fx.h}).kills;
+          if(after.kills&&!before.kills) v+=foe.a+2;                 // buff flips the trade
+          if(diesBefore&&!diesAfter) v+=m.a+1;                       // buff saves it
+          v+=1;
+        } else v += fx.a*0.5;                                        // open lane: more face damage
+        if(!bb||v>bb.v) bb={l,v};
+      }
+      if(bb) consider(i,{lane:bb.l,side:me},bb.v);
+    }
+    else if(fx.k==="aoe"){
+      let kills=0,hits=0;
+      for(let l=0;l<5;l++){ const m=S.lanes[l][foeSide]; if(m){ hits++; if(m.hp<=fx.n) kills++; } }
+      consider(i,null,kills*3+hits*0.5);
+    }
+    else if(fx.k==="heal"){
+      if(p.hp<20) consider(i,null, p.hp<=10?4 : p.hp<=14?2 : 0.5);
+    }
+    else if(fx.k==="draw"){
+      if(p.hand.length<=6) consider(i,null,1.2);
+    }
+    else if(fx.k==="scry"){
+      if(p.hand.length<=7) consider(i,null,1.1);
+    }
+  });
+  return best;
+}
+async function aiPlayTricks(){
+  for(let guard=0; guard<12 && !S.over; guard++){
+    const act=aiChooseTrick();
+    if(!act) return;
+    castTrick(act.i,act.target);
+    await sleep(750);
+  }
 }
 
 /* ============ DAMAGE ============ */
@@ -993,15 +1189,17 @@ function render(){
 
   renderHand(selCard);
 
-  $("mullBtn").classList.toggle("hidden", !canMulligan());
+  $("mullBtn").classList.toggle("hidden", !canMulligan()||isAiTurn());
 
   const btn=$("endBtn");
   if(S.phase==="combat"){ btn.textContent="⚔️ Fighting…"; btn.disabled=true; }
+  else if(isAiTurn()){ btn.textContent="🤖 Thinking…"; btn.disabled=true; }
   else{
     btn.disabled=false;
     btn.textContent={z1:"Done → Otherworld's turn",p:"Done → Regime tricks",z2:"Start Combat ⚔️"}[S.phase]||"End Phase";
   }
 
+  if(isAiTurn()&&S.phase!=="combat"){ hint(`🤖 ${sideName(S.aiSide)} is thinking…`); saveGame(); return; }
   if(selCard){
     if(selCard.t==="m") hint("Tap a glowing lane to place it · tap elsewhere to cancel");
     else if(selCard.fx.k==="dmg") hint("Tap an enemy minion or the enemy hero · tap elsewhere to cancel");
@@ -1047,7 +1245,7 @@ function cardFaceMarkup(card){
 }
 function renderHand(selCard){
   const handEl=$("hand"); handEl.innerHTML="";
-  if(S.phase==="combat"||S.over||S.handoff){ updateHandFade(); return; }
+  if(S.phase==="combat"||S.over||S.handoff||isAiTurn()){ updateHandFade(); return; } // AI's hand stays hidden
   P(S.active).hand.forEach((card,i)=>{
     const el=document.createElement("div");
     el.className="card";
@@ -1126,7 +1324,7 @@ function gameOver(winner){
   const flavor=winner==="plant"?"The story finds its hero.":"The Regime holds absolute power.";
   $("overlayCard").innerHTML=`<div class="big">${face}</div><h2>${heading}</h2><p>${flavor} GG!</p><div class="confirmRow"><button id="menuBtn" class="secondary">🏠 Main Menu</button><button id="againBtn">Play Again</button></div>`;
   $("overlay").classList.remove("hidden");
-  $("againBtn").onclick=()=>{ $("overlay").classList.add("hidden"); newGame(); };
+  $("againBtn").onclick=()=>{ const m=S.mode,a=S.aiSide; $("overlay").classList.add("hidden"); newGame(m,a); };
   $("menuBtn").onclick=()=>{ $("overlay").classList.add("hidden"); S=null; showScreen("homeScreen"); };
   render();
 }
@@ -1144,7 +1342,7 @@ function confirmNewGame(){
   $("overlayCard").innerHTML=`<div class="big">⚠️</div><h2>Start a new game?</h2><p>This ends the current match for both players — no undo.</p><div class="confirmRow"><button id="cancelNewBtn" class="secondary">Cancel</button><button id="confirmNewBtn" class="danger">New Game</button></div>`;
   $("overlay").classList.remove("hidden");
   $("cancelNewBtn").onclick=()=>{ $("overlay").classList.add("hidden"); render(); };
-  $("confirmNewBtn").onclick=()=>{ $("overlay").classList.add("hidden"); newGame(); };
+  $("confirmNewBtn").onclick=()=>{ const m=S?S.mode:"hotseat",a=S?S.aiSide:null; $("overlay").classList.add("hidden"); newGame(m,a); };
 }
 /* full battle log — the one-line bar only shows the last 2 events */
 function showLogHistory(){
@@ -1166,9 +1364,21 @@ function showHelp(){
   <p><b>Factions:</b> The Otherworld is tougher and can heal. The Regime hits harder and has area damage.</p>
   <p><b>Mulligan:</b> on turn 1, each player may redraw their whole hand once — before playing anything.</p>
   <p><b>Tips:</b> tap the small log line to see the full battle history. A game in progress is saved automatically — if the page closes, use Resume on the home screen.</p>
-  <p><b>Hotseat:</b> pass the phone at each phase-change screen so hands stay secret.</p></div><button id="closeHelp">Close</button>`;
+  <p><b>Hotseat:</b> pass the phone at each phase-change screen so hands stay secret.</p>
+  <p><b>Vs AI:</b> in a solo game the AI plays its phases by itself — watch the board and the log to see its moves.</p></div><button id="closeHelp">Close</button>`;
   $("overlay").classList.remove("hidden");
   $("closeHelp").onclick=()=>{ $("overlay").classList.add("hidden"); render(); };
+}
+
+/* pick your faction for a solo game — the AI takes the other one */
+function showAiSidePicker(){
+  $("overlayCard").innerHTML=`<div class="big">🤖</div><h2>Play vs AI</h2><p>Pick your faction — the AI plays the other.</p>
+  <div class="confirmRow"><button id="pickPlant">🗡️ Otherworld</button><button id="pickZombie" style="background:linear-gradient(180deg,#7a5aa0,#5a3f7a);">🎖️ Regime</button></div>
+  <button id="pickCancel" class="secondary">Cancel</button>`;
+  $("overlay").classList.remove("hidden");
+  $("pickPlant").onclick=()=>{ $("overlay").classList.add("hidden"); showScreen("app"); newGame("ai","zombie"); };
+  $("pickZombie").onclick=()=>{ $("overlay").classList.add("hidden"); showScreen("app"); newGame("ai","plant"); };
+  $("pickCancel").onclick=()=>{ $("overlay").classList.add("hidden"); };
 }
 
 /* ============ SCREENS ============ */
@@ -1190,6 +1400,7 @@ $("mullBtn").onclick=doMulligan;
 $("zombieBar").onclick=()=>onHeroTap("zombie");
 $("plantBar").onclick=()=>onHeroTap("plant");
 $("playBtn").onclick=()=>{ showScreen("app"); newGame(); };
+$("aiBtn").onclick=showAiSidePicker;
 $("resumeBtn").onclick=resumeGame;
 $("compendiumBtn").onclick=()=>{ renderCompendium(); showScreen("compendiumScreen"); };
 $("compendiumScreen").querySelector(".screenBody").addEventListener("click", e=>{
