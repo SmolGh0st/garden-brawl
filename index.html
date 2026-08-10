@@ -295,7 +295,7 @@
   #compendiumScreen .screenBody, #deckScreen .screenBody { flex:1; min-height:0; overflow-y:auto; padding:12px 12px 24px; -webkit-overflow-scrolling:touch; }
   .compSectionTitle { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:#9ecf7f; margin:0 0 8px; }
   .compSectionTitle.zombieSection { color:#c9a2ff; margin-top:18px; }
-  .compGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:8px 14px; }
+  .compGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:14px; }
   #compendiumScreen .card { flex:none; height:auto; min-height:118px; }
   #compendiumScreen .card .cDesc { overflow:visible; }
   /* the compendium is reachable before any turn sets body[data-active], so its cards
@@ -343,6 +343,11 @@
   #overlayCard h2 { font-size:19px; margin:8px 0 4px; }
   #overlayCard p { font-size:13px; color:#b8c4a8; line-height:1.45; margin:6px 0; }
   #overlayCard button { margin-top:14px; width:100%; padding:13px; border-radius:10px; border:none; font-size:15px; font-weight:700; background:linear-gradient(180deg,#5a8f4d,#3f6b35); color:#fff; }
+  /* the zoomed-card modal (Compendium tap / board tap) recolors purple for a Regime card,
+     instead of always defaulting to the Otherworld's green — matches the purple accent
+     already used everywhere else a Regime card/side shows up (hand cards, buttons, etc.) */
+  #overlayCard.zSide { background:#241c30; border-color:#c9a2ff42; }
+  #overlayCard.zSide button:not(.secondary):not(.danger) { background:linear-gradient(180deg,#7a5aa0,#5a3f7a); }
   #overlayCard .help { text-align:left; font-size:11.5px; }
   #overlayCard .confirmRow { display:flex; gap:8px; margin-top:14px; }
   #overlayCard .confirmRow button { flex:1; margin-top:0; }
@@ -583,7 +588,9 @@ const CARD_FLAVOR = {
   "Blitzkrieg": "Speed is a weapon before it's a strategy.",
   "Requisition": "Everything belongs to the state, eventually.",
   "Purge": "Simplest way to solve a disagreement.",
-  "Show Trial": "The verdict was decided before the trial began."
+  "Show Trial": "The verdict was decided before the trial began.",
+  "Transfigure": "One shape is as good as another, if you squint.",
+  "Reassignment": "The state finds new uses for everything."
 };
 function flavorFor(card){ return CARD_FLAVOR[card.n] || ""; }
 
@@ -637,7 +644,8 @@ const PLANT_POOL = [
   E("Blooming Grove","🌿",2,{k:"envAllHp",n:2},"When combat reaches this lane: give the minion(s) here +2 HP, on either side","common"),
   E("Chilling Mist","❄️",3,{k:"envEnemyAtk",n:-1},"When combat reaches this lane: give the Regime minion here -1 Attack","common"),
   T("Honed Blade","🔪✨",1,{k:"buffHand",stat:"a",n:1},"Give a minion in your hand +1 Attack","rare"),
-  T("Traveler's Ward","🧭",1,{k:"buffHand",stat:"hp",n:1},"Give a minion in your hand +1 HP","rare")
+  T("Traveler's Ward","🧭",1,{k:"buffHand",stat:"hp",n:1},"Give a minion in your hand +1 HP","rare"),
+  T("Transfigure","🔄",2,{k:"transfigure"},"Turn a card in your hand into a random Otherworld card","common")
 ];
 /* the "Regime" faction — history / government-systems theme */
 const ZOMBIE_POOL = [
@@ -660,7 +668,8 @@ const ZOMBIE_POOL = [
   E("Scorched Earth","🔥",2,{k:"envAllAtk",n:2},"When combat reaches this lane: give the minion(s) here +2 Attack, on either side","common"),
   E("Toxic Fallout","☣️",3,{k:"envEnemyHp",n:-1},"When combat reaches this lane: give the Otherworld minion here -1 HP","common"),
   T("Combat Drills","🎯",1,{k:"buffHand",stat:"a",n:1},"Give a minion in your hand +1 Attack","rare"),
-  T("Field Rations","🍞",1,{k:"buffHand",stat:"hp",n:1},"Give a minion in your hand +1 HP","rare")
+  T("Field Rations","🍞",1,{k:"buffHand",stat:"hp",n:1},"Give a minion in your hand +1 HP","rare"),
+  T("Reassignment","🔄",2,{k:"transfigure"},"Turn a card in your hand into a random Regime card","common")
 ];
 /* lookup by name for the Compendium's zoomed-in card view */
 const ALL_CARDS = {};
@@ -882,6 +891,7 @@ function canPlayCard(card){
   if(fx.k==="aoe") return S.lanes.some(l=>l[otherSide(S.active)]);
   if(fx.k==="heal") return P(S.active).hp<20;
   if(fx.k==="buffHand") return P(S.active).hand.some(c=>c!==card && c.t==="m");
+  if(fx.k==="transfigure") return P(S.active).hand.some(c=>c!==card);
   return true; // dmg (hero always targetable), draw
 }
 function onCardTap(i){
@@ -896,6 +906,10 @@ function onCardTap(i){
     if(selCard && selCard.t==="t" && selCard.fx.k==="buffHand"){
       if(card.t==="m") castTrick(S.sel,{handCardRef:card});
       else cancelSel();
+      return;
+    }
+    if(selCard && selCard.t==="t" && selCard.fx.k==="transfigure"){
+      castTrick(S.sel,{handCardRef:card}); // any card type in hand is a valid target
       return;
     }
   }
@@ -1032,6 +1046,24 @@ function castTrick(idx,target){
       if(fx.stat==="a") t.a=(t.a||0)+fx.n;
       else t.h=(t.h||0)+fx.n;
       addLog(`${card.e}${card.n} gives ${t.e}${t.n} in hand +${fx.n} ${fx.stat==="a"?"Attack":"HP"}`);
+    }
+  }
+  else if(fx.k==="transfigure"){
+    // same object-identity trick as buffHand (see note above) — find the targeted card,
+    // then swap it in place for a fresh random pick from the caster's own faction pool
+    // (any card type: minion, trick, or environment), excluding itself so it always changes
+    const t=P(side).hand.find(c=>c===target.handCardRef);
+    if(t){
+      const pool=side==="plant"?PLANT_POOL:ZOMBIE_POOL;
+      const candidates=pool.filter(c=>c.n!==t.n);
+      const pick=candidates[Math.floor(Math.random()*candidates.length)];
+      if(pick){
+        const idx=P(side).hand.indexOf(t);
+        const newCard={...pick};
+        if(idx>-1) P(side).hand[idx]=newCard;
+        addLog(`${card.e}${card.n} turns ${t.e}${t.n} into ${newCard.e}${newCard.n}!`);
+        floaterAtEl($(heroBarId(side)),"🔄","#c9a2ff");
+      }
     }
   }
   render();
@@ -1535,6 +1567,7 @@ function render(){
     else if(selCard.fx.k==="buff") hint("Tap one of your minions · tap elsewhere to cancel");
     else if(selCard.fx.k==="destroy") hint("Tap an enemy minion · tap elsewhere to cancel");
     else if(selCard.fx.k==="buffHand") hint("Tap a minion in your hand to buff it · tap elsewhere to cancel");
+    else if(selCard.fx.k==="transfigure") hint("Tap a card in your hand to transform it · tap elsewhere to cancel");
     else hint("Tap the card again to cast");
   } else if(S.phase==="combat") hint("Lanes fight left to right — minions trade simultaneously");
   else hint("Tap a card to play it, or end the phase");
@@ -1600,6 +1633,7 @@ function renderHand(selCard){
   const handEl=$("hand"); handEl.innerHTML="";
   if(S.phase==="combat"||S.over||S.handoff||isAiTurn()){ updateHandFade(); return; } // AI's hand stays hidden
   const buffHandSel = selCard && selCard.t==="t" && selCard.fx.k==="buffHand";
+  const transfigureSel = selCard && selCard.t==="t" && selCard.fx.k==="transfigure";
   P(S.active).hand.forEach((card,i)=>{
     const el=document.createElement("div");
     el.className="card";
@@ -1607,6 +1641,8 @@ function renderHand(selCard){
     if(S.sel===i) el.classList.add("selected");
     // while a hand-buff trick is selected, spotlight the other minions it can target
     if(buffHandSel && i!==S.sel && card.t==="m") el.classList.add("validHandTarget");
+    // Transfigure can target any card type in hand except itself
+    if(transfigureSel && i!==S.sel) el.classList.add("validHandTarget");
     el.innerHTML=cardFaceMarkup(card);
     el.onclick=()=>onCardTap(i);
     handEl.appendChild(el);
@@ -1638,6 +1674,10 @@ function zoomCard(card){
   const descHtml = card.d ? `<p>${card.d}</p>` : "";
   const flavor = flavorFor(card);
   const flavorHtml = flavor ? `<p class="zFlavor">${flavor}</p>` : "";
+  // recolor the modal purple for a Regime card instead of always defaulting to
+  // the Otherworld's green — same lookup used to tint compendium/deckbuilder cards
+  const zombieCard = ZOMBIE_POOL.some(c=>c.n===card.n);
+  $("overlayCard").classList.toggle("zSide", zombieCard);
   $("overlayCard").innerHTML = `
     <div class="zArt">${artHtml}</div>
     <h2>${card.n}</h2>
@@ -1645,7 +1685,7 @@ function zoomCard(card){
     ${kwHtml}${descHtml}${flavorHtml}
     <button id="closeZoom">Close</button>`;
   $("overlay").classList.remove("hidden");
-  $("closeZoom").onclick=()=>{ $("overlay").classList.add("hidden"); if(S) render(); };
+  $("closeZoom").onclick=()=>{ $("overlay").classList.add("hidden"); $("overlayCard").classList.remove("zSide"); if(S) render(); };
 }
 /* tapping a minion already on the board (no card selected) opens the same zoomed
    view as the compendium — base card info (cost/keyword text/flavor) merged with
