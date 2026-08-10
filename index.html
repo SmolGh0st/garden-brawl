@@ -256,6 +256,25 @@
      must not depend on that leftover attribute — state their own colors outright */
   #compendiumScreen #compPlantGrid .card { background:linear-gradient(180deg,#2f3d2a,#182016); border-color:#8fbf7a4d; }
   #compendiumScreen #compZombieGrid .card { background:linear-gradient(180deg,#3a2f47,#201827); border-color:#c9a2ff42; }
+  #compendiumScreen .card:active { transform:scale(0.96); transition:transform 0.1s; }
+
+  /* zoomed-in card view (opens the shared #overlay from the Compendium) */
+  .zArt {
+    width:200px; height:200px; max-width:70vw; max-height:70vw; margin:0 auto 12px; border-radius:16px;
+    overflow:hidden; background:radial-gradient(ellipse at 50% 35%, #ffffff1e, #00000048 78%);
+    border:1px solid #ffffff2a; box-shadow:inset 0 2px 8px #0009;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .zArt img { width:100%; height:100%; object-fit:cover; display:block; }
+  .zArt .zEmoji { font-size:88px; filter:drop-shadow(0 4px 6px #0009); }
+  .zStats { display:flex; justify-content:center; gap:14px; margin:4px 0 8px; }
+  .zStats .zStat { font-size:16px; font-weight:800; padding:3px 10px; border-radius:10px; background:#00000044; }
+  .zStats .zCost { color:#e0c14f; }
+  .zStats .zAtk { color:#ffb95e; }
+  .zStats .zHp { color:#7fe06d; }
+  .zStats .zTrick { color:#c9a2ff; }
+  #overlayCard .zKw { color:#ffd75e; font-size:12px; text-align:left; }
+  #overlayCard .zFlavor { font-style:italic; color:#8a967f; }
 
   /* overlay */
   #overlay {
@@ -349,6 +368,46 @@
 const CARD_ART = { "Communist Manifesto":"art/communist-manifesto.png" };
 function artFor(name){ return CARD_ART[name] || null; }
 
+/* CARD FLAVOR
+   A short quote or line of lore per card, shown in the Compendium's zoomed-in view
+   (in addition to, not instead of, the card's mechanical text). Cards without an
+   entry here just skip the flavor line. */
+const CARD_FLAVOR = {
+  "Sprout Shooter": "“Somebody has to go first.”",
+  "Sunflower Sage": "Every garden keeps one elder who remembers the last frost.",
+  "Nut Wall": "It has not moved in three seasons. It does not intend to.",
+  "Deadly Shroom": "Pretty is not the same as safe.",
+  "Thorn Lasher": "Touch the leaves and find out.",
+  "Cabbage Lobber": "Rooted so deep the Regime gave up digging.",
+  "Pepper Sniper": "One shot, one lane, no warning.",
+  "Snap Trap": "The garden's oldest trick — wait, then close.",
+  "Melon Guard": "Heavy enough to shrug off a direct hit.",
+  "Bamboo Skewer": "Grows straight through anything in its way.",
+  "Oak Titan": "Older than the war. Will outlast it too.",
+  "Grow Big": "Given enough sun, anything becomes a threat.",
+  "Solar Flare": "The sun doesn't take sides, but today it's aiming.",
+  "Photosynthesize": "Patience, converted directly into options.",
+  "Healing Rain": "The garden heals what the Regime breaks.",
+  "Devour": "Nature has always had a taste for control.",
+  "Foot Soldier": "First to the line, first to be replaced.",
+  "Agitator": "A rumor with legs.",
+  "Bureaucrat": "The stamp matters more than what's stamped.",
+  "Checkpoint Guard": "Papers, please.",
+  "Informant": "Everyone talks eventually.",
+  "Propagandist": "Say it loud enough and it becomes true.",
+  "Saboteur": "In and out before the alarm sounds.",
+  "Shock Trooper": "Doesn't stop when the first target falls.",
+  "Riot Police": "The line does not break. The line is the point.",
+  "Cavalry Charge": "By the time you see it, it's already past you.",
+  "Iron Curtain": "Nothing gets through. Nothing gets out.",
+  "Communist Manifesto": "“A spectre is haunting Europe.”",
+  "Blitzkrieg": "Speed is a weapon before it's a strategy.",
+  "Requisition": "Everything belongs to the state, eventually.",
+  "Purge": "Simplest way to solve a disagreement.",
+  "Show Trial": "The verdict was decided before the trial began."
+};
+function flavorFor(card){ return CARD_FLAVOR[card.n] || ""; }
+
 const KWNAME = { deadly:"☠️Deadly", armored:"🛡️Armored 1", strike:"⤳Strikethrough", frenzy:"🔥Frenzy" };
 const KWDESC = {
   deadly:"☠️ Deadly: destroys any minion it damages",
@@ -399,6 +458,9 @@ const ZOMBIE_POOL = [
   T("Purge","🩸",2,{k:"aoe",n:1},"Deal 1 damage to ALL plant minions"), // NEW — regime alone gets AoE
   T("Show Trial","⚖️",5,{k:"destroy"},"Destroy a plant minion")
 ];
+/* lookup by name for the Compendium's zoomed-in card view */
+const ALL_CARDS = {};
+[...PLANT_POOL, ...ZOMBIE_POOL].forEach(c => { ALL_CARDS[c.n] = c; });
 /* ============ HELPERS ============ */
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
@@ -881,13 +943,38 @@ function renderHand(selCard){
   });
   updateHandFade();
 }
-/* compendium: every unique card in both pools, browsable outside of a match */
+/* compendium: every unique card in both pools, browsable outside of a match.
+   Cards are tappable — data-name looks them up in ALL_CARDS for the zoomed-in view. */
 let compendiumBuilt=false;
 function renderCompendium(){
   if(compendiumBuilt) return;
-  $("compPlantGrid").innerHTML = PLANT_POOL.map(c=>`<div class="card">${cardFaceMarkup(c)}</div>`).join("");
-  $("compZombieGrid").innerHTML = ZOMBIE_POOL.map(c=>`<div class="card zSide">${cardFaceMarkup(c)}</div>`).join("");
+  $("compPlantGrid").innerHTML = PLANT_POOL.map(c=>`<div class="card" data-name="${c.n}">${cardFaceMarkup(c)}</div>`).join("");
+  $("compZombieGrid").innerHTML = ZOMBIE_POOL.map(c=>`<div class="card zSide" data-name="${c.n}">${cardFaceMarkup(c)}</div>`).join("");
   compendiumBuilt=true;
+}
+/* zoomed-in card view: bigger art, full stats, and a flavor quote if one exists */
+function zoomCard(card){
+  const art=artFor(card.n);
+  const artHtml = art
+    ? `<img src="${art}" alt="${card.n}">`
+    : `<span class="zEmoji">${card.e}</span>`;
+  const isMinion = card.t==="m";
+  const statsHtml = isMinion
+    ? `<span class="zStat zCost">💠 ${card.c}</span><span class="zStat zAtk">⚔ ${card.a}</span><span class="zStat zHp">❤ ${card.h}</span>`
+    : `<span class="zStat zCost">💠 ${card.c}</span><span class="zStat zTrick">✨ Trick</span>`;
+  const kwHtml = isMinion && card.kw.length
+    ? `<p class="zKw">${card.kw.map(k=>KWDESC[k]).join("<br>")}</p>` : "";
+  const descHtml = card.d ? `<p>${card.d}</p>` : "";
+  const flavor = flavorFor(card);
+  const flavorHtml = flavor ? `<p class="zFlavor">${flavor}</p>` : "";
+  $("overlayCard").innerHTML = `
+    <div class="zArt">${artHtml}</div>
+    <h2>${card.n}</h2>
+    <div class="zStats">${statsHtml}</div>
+    ${kwHtml}${descHtml}${flavorHtml}
+    <button id="closeZoom">Close</button>`;
+  $("overlay").classList.remove("hidden");
+  $("closeZoom").onclick=()=>{ $("overlay").classList.add("hidden"); };
 }
 /* edge-fade cue: tells the player there are more cards off-screen to scroll to */
 function updateHandFade(){
@@ -977,6 +1064,12 @@ $("plantBar").onclick=()=>onHeroTap("plant");
 $("playBtn").onclick=()=>{ showScreen("app"); newGame(); };
 $("resumeBtn").onclick=resumeGame;
 $("compendiumBtn").onclick=()=>{ renderCompendium(); showScreen("compendiumScreen"); };
+$("compendiumScreen").querySelector(".screenBody").addEventListener("click", e=>{
+  const cardEl=e.target.closest(".card");
+  if(!cardEl) return;
+  const card=ALL_CARDS[cardEl.dataset.name];
+  if(card) zoomCard(card);
+});
 $("compBackBtn").onclick=()=>showScreen("homeScreen");
 if(loadSave()) $("resumeBtn").classList.remove("hidden");
 showScreen("homeScreen");
