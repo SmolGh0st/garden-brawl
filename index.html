@@ -327,6 +327,12 @@
   #overlayCard .confirmRow button { flex:1; margin-top:0; }
   #overlayCard button.secondary { background:linear-gradient(180deg,#555,#3a3a3a); }
   #overlayCard button.danger { background:linear-gradient(180deg,#c0524f,#8a3a37); }
+
+  /* scry picker */
+  .scryHint { color:#8a967f; }
+  .scryRow { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:10px; }
+  #overlayCard .scryCard { position:relative; cursor:pointer; transition:transform .12s ease, border-color .12s ease; }
+  #overlayCard .scryCard:active { transform:scale(0.94); border-color:#ffd75e; }
 </style>
 </head>
 <body data-active="zombie">
@@ -421,7 +427,7 @@ const CARD_FLAVOR = {
   "Ancient Dragon": "Kingdoms rise and fall. It just keeps sleeping.",
   "Blessing": "Luck, borrowed from somewhere kinder.",
   "Fireball": "Level one spell. Still ends most arguments.",
-  "Scry": "The future is easier to read than the present.",
+  "Divination": "The future is easier to read than the present.",
   "Lay on Hands": "Some wounds close faster with the right words.",
   "Banish": "Not gone. Just... elsewhere.",
   "Foot Soldier": "First to the line, first to be replaced.",
@@ -463,7 +469,7 @@ function T(n,e,c,fx,d){ return {t:"t",n,e,c,fx,d}; }
    trademark risk if this is ever shown beyond friends. */
 const PLANT_POOL = [
   M("Squire","🛡️",1,1,3),                                          // was 1/2 — sturdier early body
-  M("Wandering Bard","🎻",2,1,2,[],{k:"draw",n:1},"When played: draw a card"),
+  M("Wandering Bard","🎻",2,1,2,[],{k:"scry",n:2},"When played: Scry 2 — draw 2, keep 1, shuffle the rest back"),
   M("Stone Golem","🗿",2,0,7),                                      // was 0/6
   M("Rogue","🔪",2,1,1,["deadly"]),
   M("Goblin Raider","👺",2,3,1),
@@ -475,7 +481,7 @@ const PLANT_POOL = [
   M("Ancient Dragon","🐉",6,5,8),                                   // was 6/6 — the wall that wins long games
   T("Blessing","✨",1,{k:"buff",a:1,h:3},"Give an Otherworld minion +1/+3"), // was +2/+2 — defensive buff
   T("Fireball","💥",2,{k:"dmg",n:3},"Deal 3 damage to a Regime minion or hero"),
-  T("Scry","🔮",2,{k:"draw",n:2},"Draw 2 cards"),
+  T("Divination","🔮",2,{k:"scry",n:3},"Scry 3 — draw 3, keep 1, shuffle the rest back"),
   T("Lay on Hands","🙏",2,{k:"heal",n:4},"Restore 4 HP to your hero (max 20)"), // NEW — the Otherworld alone can heal
   T("Banish","🌀",5,{k:"destroy"},"Destroy a Regime minion")
 ];
@@ -631,7 +637,7 @@ function onCardTap(i){
     return;
   }
   if(S.sel===i){
-    if(card.t==="t"&&["draw","heal","aoe"].includes(card.fx.k)){ castTrick(i,null); return; }
+    if(card.t==="t"&&["draw","heal","aoe","scry"].includes(card.fx.k)){ castTrick(i,null); return; }
     S.sel=null; render(); return;
   }
   S.sel=i; render();
@@ -671,6 +677,7 @@ function playMinion(idx,lane){
     if(card.op.k==="draw") draw(S.active,card.op.n);
     else if(card.op.k==="dmgLane" && S.lanes[lane][otherSide(S.active)])
       damageMinion(lane,otherSide(S.active),card.op.n,{});
+    else if(card.op.k==="scry") startScry(S.active,card.op.n);
   }
   render();
 }
@@ -683,7 +690,7 @@ function castTrick(idx,target){
   let anchorEl=null;
   if(target && target.hero) anchorEl=$(heroBarId(target.hero));
   else if(target && target.lane!==undefined) anchorEl=$(`cell-${target.side}-${target.lane}`);
-  else if(fx.k==="heal" || fx.k==="draw") anchorEl=$(heroBarId(side));       // affects the caster
+  else if(fx.k==="heal" || fx.k==="draw" || fx.k==="scry") anchorEl=$(heroBarId(side)); // affects the caster
   else if(fx.k==="aoe") anchorEl=$(heroBarId(otherSide(side)));              // hits the enemy side
   if(anchorEl){
     const r=anchorEl.getBoundingClientRect();
@@ -718,6 +725,49 @@ function castTrick(idx,target){
     const m=S.lanes[target.lane][target.side];
     if(m){ addLog(`${m.e}${m.n} destroyed!`); floaterAtCell(target.lane,target.side,"💥","#ff6b6b"); S.lanes[target.lane][target.side]=null; }
   }
+  else if(fx.k==="scry"){ startScry(side, fx.n); return; } // scry renders its own overlay; skip the trailing render() below
+  render();
+}
+
+/* ============ SCRY: reveal N, keep 1, shuffle rest back — hard-blocking modal, no cancel ============ */
+function startScry(side,n){
+  const p=P(side);
+  const revealed=[];
+  for(let i=0;i<n && p.deck.length>0;i++) revealed.push(p.deck.shift());
+  if(revealed.length===0){ addLog(sideName(side)+" deck empty — nothing to scry"); render(); return; }
+  if(revealed.length===1){
+    // only one card exists to look at — nothing to actually choose between
+    if(p.hand.length>=10){ addLog(sideName(side)+" hand full — "+revealed[0].n+" burned"); }
+    else p.hand.push(revealed[0]);
+    addLog(`${sideName(side)} scried, kept ${revealed[0].e}${revealed[0].n}`);
+    render();
+    return;
+  }
+  uiLock=true; render();
+  showScryPicker(side,revealed);
+}
+function showScryPicker(side,revealed){
+  const oc=$("overlayCard");
+  oc.style.maxWidth="440px"; // wider than the default 340px so revealed cards fit in a row
+  oc.innerHTML =
+    `<h2>🔮 Scry ${revealed.length}</h2><p class="scryHint">Pick one to keep — the rest shuffle back into the deck.</p>`+
+    `<div class="scryRow">${revealed.map((c,i)=>`<div class="card scryCard" data-i="${i}">${cardFaceMarkup(c)}</div>`).join("")}</div>`;
+  oc.querySelectorAll(".scryCard").forEach(el=>{
+    el.onclick=()=>resolveScry(side,revealed,+el.dataset.i);
+  });
+  $("overlay").classList.remove("hidden");
+}
+function resolveScry(side,revealed,chosenIdx){
+  const p=P(side), chosen=revealed[chosenIdx];
+  const rest=revealed.filter((_,i)=>i!==chosenIdx);
+  if(p.hand.length>=10){ addLog(sideName(side)+" hand full — "+chosen.n+" burned"); }
+  else p.hand.push(chosen);
+  p.deck.push(...rest);
+  shuffle(p.deck);
+  addLog(`${sideName(side)} scried, kept ${chosen.e}${chosen.n}`);
+  $("overlayCard").style.maxWidth=""; // restore default width for other overlay uses
+  $("overlay").classList.add("hidden");
+  uiLock=false;
   render();
 }
 
@@ -1097,6 +1147,7 @@ function showLogHistory(){
   $("closeLog").onclick=()=>{ $("overlay").classList.add("hidden"); render(); };
 }
 function showHelp(){
+  if(uiLock) return; // don't let Help stomp a Scry (or any other) modal that's mid-choice
   $("overlayCard").innerHTML=`<h2>🗡️ Garden Brawl 🎖️</h2><div class="help"><p><b>Goal:</b> knock the enemy hero from 20 HP to 0.</p>
   <p><b>Each turn:</b> both players draw 1 card and gain resources (🔷 mana for the Otherworld, 📜 decrees for the Regime) equal to the turn number (max 10). Unspent resources are lost.</p>
   <p><b>Phase order:</b> 1) Regime plays minions → 2) Otherworld plays everything → 3) Regime plays tricks → 4) Combat.</p>
