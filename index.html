@@ -32,6 +32,7 @@
     .cell .mEmoji{ font-size:32px; }
     .cell .mName{ font-size:9px; height:20px; }
     .cell .mStats{ font-size:13px; }
+    .cell .kwDot{ font-size:17px; top:-5px; right:-5px; }
     .card{ flex:0 0 96px; height:132px; }
     .card .cArt{ height:52px; }
     .card .cArt .cEmoji{ font-size:32px; }
@@ -189,7 +190,13 @@
   .cell .mName { font-size:8px; text-align:center; opacity:0.85; padding:0 2px; line-height:1.1; height:18px; overflow:hidden; }
   .cell .mStats { display:flex; gap:4px; font-size:11px; font-weight:700; }
   .cell .mStats .a { color:#ffb95e; } .cell .mStats .h { color:#7fe06d; }
-  .cell .kwDot { position:absolute; top:2px; right:3px; font-size:9px; }
+  .cell .kwDot {
+    position:absolute; top:-4px; right:-4px; font-size:15px; line-height:1;
+    display:flex; gap:1px; z-index:3; filter:drop-shadow(0 1px 2px #000d);
+    background:#0a0a0acc; border:1.5px solid #ffffff55; border-radius:9px;
+    padding:1px 3px;
+  }
+  .cell.hasMinion { cursor:pointer; }
   .laneNums { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; text-align:center; font-size:9px; color:#ffffff44; }
 
   /* floating damage */
@@ -666,7 +673,12 @@ function onCardTap(i){
 }
 function cancelSel(){ if(S && S.sel!==null && !uiLock){ S.sel=null; render(); } }
 function onCellTap(lane,side){
-  if(uiLock||S.over||S.sel===null) return;
+  if(uiLock||S.over) return;
+  if(S.sel===null){
+    const m=S.lanes[lane][side];
+    if(m) zoomPlacedMinion(m);
+    return;
+  }
   const card=P(S.active).hand[S.sel];
   if(!card) return;
   if(card.t==="m"){
@@ -1289,7 +1301,15 @@ function zoomCard(card){
     ${kwHtml}${descHtml}${flavorHtml}
     <button id="closeZoom">Close</button>`;
   $("overlay").classList.remove("hidden");
-  $("closeZoom").onclick=()=>{ $("overlay").classList.add("hidden"); };
+  $("closeZoom").onclick=()=>{ $("overlay").classList.add("hidden"); if(S) render(); };
+}
+/* tapping a minion already on the board (no card selected) opens the same zoomed
+   view as the compendium — base card info (cost/keyword text/flavor) merged with
+   this minion's current battlefield atk/hp, which may differ from base if buffed/hurt */
+function zoomPlacedMinion(m){
+  const base=ALL_CARDS[m.n];
+  if(!base) return;
+  zoomCard({...base, a:m.a, h:m.hp});
 }
 /* edge-fade cue: tells the player there are more cards off-screen to scroll to */
 function updateHandFade(){
