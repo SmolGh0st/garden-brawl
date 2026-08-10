@@ -98,6 +98,16 @@
   .row.zrow .cell { background:#3a2b4a22; }
   .row.prow .cell { background:#2b4a2b22; }
   .cell.hasMinion { border-style:solid; border-color:#ffffff33; background:#00000055; }
+  /* environments — v1 is literally just a floor tint per the plan (real art later).
+     Applied to both side-rows' cells in that lane column, so the "floor" spans the
+     whole lane rather than looking tied to one side. Only sets `background` (placed
+     after hasMinion so the tint still shows through even with a minion standing on
+     it) and deliberately leaves border-color/box-shadow alone, so it never fights
+     validSpot/validTarget/attacking below for those properties. */
+  .row .cell.envFloorGrove  { background:#2f6b3a66; }
+  .row .cell.envFloorScorch { background:#7a3a2a66; }
+  .row .cell.envFloorMist   { background:#3a5f7a66; }
+  .row .cell.envFloorToxic  { background:#5a6b2a66; }
   .cell.validSpot { border-color:#7fe06d; border-style:solid; box-shadow:0 0 8px #7fe06d55 inset; }
   .cell.validTarget { border-color:#ffd75e; border-style:solid; box-shadow:0 0 8px #ffd75e66 inset; }
   .cell.attacking { border-color:#ff8c42; box-shadow:0 0 14px #ff8c42aa; transform:scale(1.08); transition:all 0.15s; z-index:2; }
@@ -198,6 +208,7 @@
   }
   .cell.hasMinion { cursor:pointer; }
   .laneNums { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; text-align:center; font-size:9px; color:#ffffff44; }
+  .laneEnvTag { margin-left:2px; font-size:11px; filter:drop-shadow(0 1px 2px #000d); }
 
   /* floating damage */
   .floater { position:fixed; font-size:20px; font-weight:800; pointer-events:none; z-index:50; animation:floatUp 0.9s forwards; text-shadow:0 1px 3px #000; }
@@ -246,6 +257,7 @@
   .card .cStats { font-size:10px; font-weight:800; display:flex; gap:6px; }
   .card .cStats .a { color:#ffb95e; } .card .cStats .h { color:#7fe06d; }
   .card .trickTag { font-size:7.5px; color:#c9a2ff; font-weight:700; }
+  .card .trickTag.envTag { color:#9fd08a; }
 
   /* controls */
   #controls { display:flex; gap:8px; padding:0 10px 10px; align-items:center; }
@@ -305,6 +317,7 @@
   .zStats .zAtk { color:#ffb95e; }
   .zStats .zHp { color:#7fe06d; }
   .zStats .zTrick { color:#c9a2ff; }
+  .zStats .zEnv { color:#9fd08a; }
   /* same gold diamond badge as the in-hand/compendium card face, just bigger — the cost
      symbol should look identical whether you're looking at the card or the zoomed view */
   .zCostWrap { display:inline-flex; align-items:center; justify-content:center; width:40px; height:40px; }
@@ -375,6 +388,13 @@
   .haveBadge {
     position:absolute; bottom:-5px; right:-4px; z-index:2;
     background:#ffd75e; color:#221c07; font-size:10px; font-weight:800;
+    border-radius:8px; padding:1px 6px; box-shadow:0 1px 3px #000c;
+  }
+  /* the actual "you own N of these" number — sits top-right, opposite the cost diamond
+     (top-left) so the two are never confused for each other again */
+  .ownBadge {
+    position:absolute; top:-6px; right:-5px; z-index:2;
+    background:#d4d4d4; color:#1a1a1a; font-size:10px; font-weight:800;
     border-radius:8px; padding:1px 6px; box-shadow:0 1px 3px #000c;
   }
   .cardCtl { display:flex; align-items:center; justify-content:center; gap:8px; min-height:32px; }
@@ -460,7 +480,7 @@
     <div class="spacer"></div>
   </div>
   <div class="screenBody">
-    <p class="deckRules"><span class="coreLegend"><span class="coreSwatch"></span>Core Set — you own 4 copies</span></p>
+    <p class="deckRules"><span class="coreLegend"><span class="coreSwatch"></span>Core Set — the ×4 badge shows what you own</span></p>
     <h3 class="compSectionTitle plantSection">⚔️ Otherworld</h3>
     <div class="compGrid" id="compPlantGrid"></div>
     <h3 class="compSectionTitle zombieSection">🎖️ Regime</h3>
@@ -489,7 +509,7 @@
   <div id="phaseBanner">—</div>
   <div id="board">
     <div class="row zrow" id="zRow"></div>
-    <div class="laneNums"><span>Lane 1</span><span>Lane 2</span><span>Lane 3</span><span>Lane 4</span><span>Lane 5</span></div>
+    <div class="laneNums" id="laneNums"></div>
     <div class="row prow" id="pRow"></div>
   </div>
   <div class="herobar" id="plantBar">
@@ -573,8 +593,20 @@ const KWDESC = {
   strike:"⤳ Strikethrough: attacks hit the minion AND the hero",
   frenzy:"🔥 Frenzy: after killing a minion, attacks the hero too"
 };
-function M(n,e,c,a,h,kw,op,d){ return {t:"m",n,e,c,a,h,kw:kw||[],op:op||null,d:d||""}; }
-function T(n,e,c,fx,d){ return {t:"t",n,e,c,fx,d}; }
+function M(n,e,c,a,h,kw,op,d,r){ return {t:"m",n,e,c,a,h,kw:kw||[],op:op||null,d:d||"",r:r||null}; }
+function T(n,e,c,fx,d,r){ return {t:"t",n,e,c,fx,d,r:r||null}; }
+/* ENVIRONMENTS — a third card type. Played onto a LANE (not either side's row) like a
+   minion, but occupies its own slot per lane and doesn't care who owns what's already
+   there. Right before combat resolves in that lane, the environment triggers its effect
+   against whatever's currently occupying the lane, then combat proceeds as normal.
+   Playing a new environment onto a lane that already has one replaces (voids) the old
+   one outright — no swap-back, no returning it to a hand or deck.
+   fx.k values: "envAllHp"/"envAllAtk" apply to BOTH sides' minions in the lane (n can be
+   negative); "envEnemyAtk"/"envEnemyHp" apply only to the minion belonging to whichever
+   side did NOT play the environment (relative to env.side, set when it's played).
+   `r` = rarity (common/rare/epic/legendary) — G asked to always be asked for this on new
+   cards; stored on the card but not yet rendered anywhere (no rarity UI built yet). */
+function E(n,e,c,fx,d,r){ return {t:"e",n,e,c,fx,d,r:r||null}; }
 
 /* FACTION IDENTITY (first pass, deliberately modest — rebalance freely):
    The Otherworld leans DEFENSIVE — tougher bodies, healing, defensive buff.
@@ -600,7 +632,9 @@ const PLANT_POOL = [
   T("Fireball","💥",2,{k:"dmg",n:3},"Deal 3 damage to a Regime minion or hero"),
   T("Divination","🔮",2,{k:"scry",n:3},"Scry 3 — draw 3, keep 1, shuffle the rest back"),
   T("Lay on Hands","🙏",2,{k:"heal",n:4},"Restore 4 HP to your hero (max 20)"), // NEW — the Otherworld alone can heal
-  T("Banish","🌀",5,{k:"destroy"},"Destroy a Regime minion")
+  T("Banish","🌀",5,{k:"destroy"},"Destroy a Regime minion"),
+  E("Blooming Grove","🌿",2,{k:"envAllHp",n:2},"When combat reaches this lane: give the minion(s) here +2 HP, on either side","common"),
+  E("Chilling Mist","❄️",3,{k:"envEnemyAtk",n:-1},"When combat reaches this lane: give the Regime minion here -1 Attack","common")
 ];
 /* the "Regime" faction — history / government-systems theme */
 const ZOMBIE_POOL = [
@@ -619,7 +653,9 @@ const ZOMBIE_POOL = [
   T("Blitzkrieg","⚡",2,{k:"dmg",n:3},"Deal 3 damage to an Otherworld minion or hero"),
   T("Requisition","📦",2,{k:"draw",n:2},"Draw 2 cards"),
   T("Purge","🩸",2,{k:"aoe",n:1},"Deal 1 damage to ALL Otherworld minions"), // NEW — regime alone gets AoE
-  T("Show Trial","⚖️",5,{k:"destroy"},"Destroy an Otherworld minion")
+  T("Show Trial","⚖️",5,{k:"destroy"},"Destroy an Otherworld minion"),
+  E("Scorched Earth","🔥",2,{k:"envAllAtk",n:2},"When combat reaches this lane: give the minion(s) here +2 Attack, on either side","common"),
+  E("Toxic Fallout","☣️",3,{k:"envEnemyHp",n:-1},"When combat reaches this lane: give the Otherworld minion here -1 HP","common")
 ];
 /* lookup by name for the Compendium's zoomed-in card view */
 const ALL_CARDS = {};
@@ -647,6 +683,10 @@ const MAX_COPIES_OWNED = 4;
    cap (4); future non-core cards default to 0 until an unlock system exists. Used
    today just to drive the visual marker; deckbuilding itself doesn't gate on it yet. */
 function ownedCopies(name){ return isCoreCard(name) ? MAX_COPIES_OWNED : 0; }
+/* the actual visible "you own N of these" marker — G flagged that the cost diamond
+   (top-left, mana cost) was easy to mistake for a copies-owned count since nothing
+   else showed that number on the card face. This sits opposite it, top-right. */
+function coreBadgeHtml(name){ return isCoreCard(name) ? `<div class="ownBadge">×${MAX_COPIES_OWNED}</div>` : ""; }
 
 /* ============ DECKS ============ */
 /* PvZ-Heroes-style deckbuilding: every deck is exactly 40 cards, max 4 copies of
@@ -758,7 +798,7 @@ function newGame(mode,aiSide,deckIds){
     mode:mode||"hotseat", aiSide:aiSide||null, deckIds:ids,
     turn:0, phase:"idle", active:"zombie", over:false, sel:null, log:[],
     mull:{plant:true,zombie:true}, acted:{plant:false,zombie:false},
-    lanes: Array.from({length:5},()=>({plant:null,zombie:null})),
+    lanes: Array.from({length:5},()=>({plant:null,zombie:null,env:null})),
     players:{
       plant:{hp:20,res:0,deck:buildDeckFrom("plant",getDeck("plant",ids.plant).cards),hand:[]},
       zombie:{hp:20,res:0,deck:buildDeckFrom("zombie",getDeck("zombie",ids.zombie).cards),hand:[]}
@@ -826,9 +866,11 @@ function doMulligan(){
 /* ============ PLAYING CARDS ============ */
 function canPlayCard(card){
   if(card.c > P(S.active).res) return false;
-  if(S.phase==="z1" && card.t!=="m") return false;
-  if(S.phase==="z2" && card.t!=="t") return false;
+  // environments aren't minions or tricks — Regime can drop one in either of its phases
+  if(S.phase==="z1" && card.t!=="m" && card.t!=="e") return false;
+  if(S.phase==="z2" && card.t!=="t" && card.t!=="e") return false;
   if(card.t==="m") return S.lanes.some(l=>!l[S.active]);
+  if(card.t==="e") return true; // any lane is a valid target — it just replaces what's there
   const fx=card.fx;
   if(fx.k==="buff") return S.lanes.some(l=>l[S.active]);
   if(fx.k==="destroy") return S.lanes.some(l=>l[otherSide(S.active)]);
@@ -869,6 +911,12 @@ function onCellTap(lane,side){
     else cancelSel(); // tapped an invalid spot — treat as "never mind"
     return;
   }
+  if(card.t==="e"){
+    // targets the lane itself, not either side's row — tapping either row's cell for
+    // this lane column places it the same way
+    playEnvironment(S.sel,lane);
+    return;
+  }
   const m=S.lanes[lane][side], fx=card.fx;
   if(!m){ cancelSel(); return; }
   if(fx.k==="buff" && side===S.active) castTrick(S.sel,{lane,side});
@@ -896,6 +944,21 @@ function playMinion(idx,lane){
       damageMinion(lane,otherSide(S.active),card.op.n,{});
     else if(card.op.k==="scry") startScry(S.active,card.op.n);
   }
+  render();
+}
+/* environments occupy their own per-lane slot — independent of which side's minions are
+   there. Playing a new one over an existing one replaces it outright (voided, gone for
+   good, not returned to a deck or hand). */
+function playEnvironment(idx,lane){
+  const card=P(S.active).hand[idx];
+  if(S.acted) S.acted[S.active]=true;
+  P(S.active).res-=card.c;
+  P(S.active).hand.splice(idx,1);
+  const prev=S.lanes[lane].env;
+  if(prev) addLog(`${card.e}${card.n} replaces ${prev.e}${prev.n} in lane ${lane+1} — the old environment is voided`);
+  else addLog(`${card.e}${card.n} settles over lane ${lane+1}`);
+  S.lanes[lane].env={n:card.n,e:card.e,side:S.active,fx:card.fx};
+  S.sel=null;
   render();
 }
 function castTrick(idx,target){
@@ -1200,9 +1263,50 @@ async function combat(){
   uiLock=false;
   if(!S.over){ await sleep(400); nextTurn(); }
 }
+/* ============ ENVIRONMENTS ============ */
+/* Fires once per lane, right before that lane's combat trade, against whatever
+   minions currently occupy it. envAllHp/envAllAtk hit both sides; envEnemyAtk/
+   envEnemyHp hit only the minion belonging to whichever side did NOT play the
+   environment. A -1 HP hazard can outright kill a minion before the fight even
+   starts — treated as a permanent stat change (like the Blessing/Manifesto buff
+   tricks), not combat damage, so it doesn't interact with armor/deadly. */
+async function triggerEnvironment(lane,env){
+  const applyTo=(side,stat,amt)=>{
+    const m=S.lanes[lane][side];
+    if(!m) return;
+    if(stat==="atk"){
+      m.a=Math.max(0,m.a+amt);
+      floaterAtCell(lane,side,(amt>0?"+":"")+amt+"⚔",amt>0?"#ffb95e":"#ff8c42");
+    } else {
+      m.hp+=amt; m.maxHp=Math.max(1,(m.maxHp||m.hp)+amt);
+      floaterAtCell(lane,side,(amt>0?"+":"")+amt+"❤",amt>0?"#7fe06d":"#ff6b6b");
+      if(m.hp<=0){
+        addLog(`${m.e}${m.n} withers away in ${env.e}${env.n}`);
+        S.lanes[lane][side]=null;
+      }
+    }
+  };
+  let touched=false;
+  const k=env.fx.k, n=env.fx.n;
+  if(k==="envAllHp"||k==="envAllAtk"){
+    ["plant","zombie"].forEach(s=>{ if(S.lanes[lane][s]){ touched=true; applyTo(s,k==="envAllHp"?"hp":"atk",n); } });
+  } else if(k==="envEnemyAtk"||k==="envEnemyHp"){
+    const foe=otherSide(env.side);
+    if(S.lanes[lane][foe]){ touched=true; applyTo(foe,k==="envEnemyAtk"?"atk":"hp",n); }
+  }
+  if(touched){
+    addLog(`${env.e}${env.n} triggers in lane ${lane+1}`);
+    render();
+    await sleep(400);
+  }
+}
 /* Both minions in a lane swing at the same time, off the same stat snapshot —
    a trade isn't decided by who goes first. Open lanes still hit the hero directly. */
 async function resolveLane(lane){
+  const env=S.lanes[lane].env;
+  if(env && !S.over) await triggerEnvironment(lane,env);
+  // re-read AFTER the environment trigger — it can kill a minion outright (a lingering
+  // -1 HP hazard on something already at 1 HP), so these must reflect that
   const p=S.lanes[lane].plant, z=S.lanes[lane].zombie;
   if(!p && !z) return;
   const pCell=$(`cell-plant-${lane}`), zCell=$(`cell-zombie-${lane}`);
@@ -1377,6 +1481,7 @@ function render(){
   const selCard=(S.sel!==null&&S.phase!=="combat")?P(S.active).hand[S.sel]:null;
   renderRow("zRow","zombie",selCard);
   renderRow("pRow","plant",selCard);
+  renderLaneNums();
 
   const dmgSel=selCard&&selCard.t==="t"&&selCard.fx.k==="dmg";
   $("zombieBar").classList.toggle("targetable",!!(dmgSel&&S.active==="plant"));
@@ -1397,6 +1502,7 @@ function render(){
   if(isAiTurn()&&S.phase!=="combat"){ hint(`🤖 ${sideName(S.aiSide)} is thinking…`); saveGame(); return; }
   if(selCard){
     if(selCard.t==="m") hint("Tap a glowing lane to place it · tap elsewhere to cancel");
+    else if(selCard.t==="e") hint("Tap any lane to place it — replaces that lane's environment · tap elsewhere to cancel");
     else if(selCard.fx.k==="dmg") hint("Tap an enemy minion or the enemy hero · tap elsewhere to cancel");
     else if(selCard.fx.k==="buff") hint("Tap one of your minions · tap elsewhere to cancel");
     else if(selCard.fx.k==="destroy") hint("Tap an enemy minion · tap elsewhere to cancel");
@@ -1405,11 +1511,18 @@ function render(){
   else hint("Tap a card to play it, or end the phase");
   saveGame();
 }
+/* which lane-floor tint class an environment's effect maps to — one per card, since
+   right now they're literally just a colored floor (real art comes later) */
+function envFloorClass(fx){
+  return {envAllHp:"envFloorGrove",envAllAtk:"envFloorScorch",envEnemyAtk:"envFloorMist",envEnemyHp:"envFloorToxic"}[fx.k]||"";
+}
 function renderRow(elId,side,selCard){
   const row=$(elId); row.innerHTML="";
   for(let lane=0;lane<5;lane++){
     const cell=document.createElement("div");
     cell.className="cell"; cell.id=`cell-${side}-${lane}`;
+    const env=S.lanes[lane].env;
+    if(env) cell.classList.add(envFloorClass(env.fx));
     cell.onclick=()=>onCellTap(lane,side);
     const m=S.lanes[lane][side];
     if(m){
@@ -1425,8 +1538,22 @@ function renderRow(elId,side,selCard){
     } else if(selCard&&selCard.t==="m"&&side===S.active){
       cell.classList.add("validSpot");
     }
+    // environments target the lane, not a side — every cell in every lane is a valid
+    // drop target while one's selected, whether or not a minion (or another env) is there
+    if(selCard&&selCard.t==="e") cell.classList.add("validSpot");
     row.appendChild(cell);
   }
+}
+/* the lane-number strip doubles as the environment indicator — its center position
+   between the two rows stays put regardless of who's active, so it reads as
+   belonging to the lane itself rather than either side */
+function renderLaneNums(){
+  const el=$("laneNums"); if(!el) return;
+  el.innerHTML = S.lanes.map((l,i)=>{
+    const env=l.env;
+    const tag = env ? `<span class="laneEnvTag" title="${escapeHtml(env.n)}">${env.e}</span>` : "";
+    return `<span>Lane ${i+1}${tag}</span>`;
+  }).join("");
 }
 /* shared by the in-hand card strip and the compendium, so the two never drift apart */
 function cardFaceMarkup(card){
@@ -1435,8 +1562,10 @@ function cardFaceMarkup(card){
     : card.d;
   const art=artFor(card.n);
   const artHtml = art ? `<img src="${art}" alt="${card.n}">` : `<span class="cEmoji">${card.e}</span>`;
-  return `<div class="cost"><span>${card.c}</span></div><div class="cArt">${artHtml}</div><div class="cName">${card.n}</div><div class="cDesc">${desc||""}</div>`+
-    (card.t==="m" ? `<div class="cStats"><span class="a">⚔${card.a}</span><span class="h">❤${card.h}</span></div>` : `<div class="trickTag">✨ TRICK</div>`);
+  const typeTag = card.t==="m"
+    ? `<div class="cStats"><span class="a">⚔${card.a}</span><span class="h">❤${card.h}</span></div>`
+    : card.t==="e" ? `<div class="trickTag envTag">🌍 ENVIRONMENT</div>` : `<div class="trickTag">✨ TRICK</div>`;
+  return `<div class="cost"><span>${card.c}</span></div><div class="cArt">${artHtml}</div><div class="cName">${card.n}</div><div class="cDesc">${desc||""}</div>${typeTag}`;
 }
 function renderHand(selCard){
   const handEl=$("hand"); handEl.innerHTML="";
@@ -1457,8 +1586,8 @@ function renderHand(selCard){
 let compendiumBuilt=false;
 function renderCompendium(){
   if(compendiumBuilt) return;
-  $("compPlantGrid").innerHTML = PLANT_POOL.map(c=>`<div class="card${isCoreCard(c.n)?' coreCard':''}" data-name="${c.n}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}</div>`).join("");
-  $("compZombieGrid").innerHTML = ZOMBIE_POOL.map(c=>`<div class="card zSide${isCoreCard(c.n)?' coreCard':''}" data-name="${c.n}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}</div>`).join("");
+  $("compPlantGrid").innerHTML = PLANT_POOL.map(c=>`<div class="card${isCoreCard(c.n)?' coreCard':''}" data-name="${c.n}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}${coreBadgeHtml(c.n)}</div>`).join("");
+  $("compZombieGrid").innerHTML = ZOMBIE_POOL.map(c=>`<div class="card zSide${isCoreCard(c.n)?' coreCard':''}" data-name="${c.n}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}${coreBadgeHtml(c.n)}</div>`).join("");
   compendiumBuilt=true;
 }
 /* zoomed-in card view: bigger art, full stats, and a flavor quote if one exists */
@@ -1471,7 +1600,7 @@ function zoomCard(card){
   const costBadge = `<span class="zCostWrap"><span class="zCostBadge"><span>${card.c}</span></span></span>`;
   const statsHtml = isMinion
     ? `${costBadge}<span class="zStat zAtk">⚔ ${card.a}</span><span class="zStat zHp">❤ ${card.h}</span>`
-    : `${costBadge}<span class="zStat zTrick">✨ Trick</span>`;
+    : card.t==="e" ? `${costBadge}<span class="zStat zEnv">🌍 Environment</span>` : `${costBadge}<span class="zStat zTrick">✨ Trick</span>`;
   const kwHtml = isMinion && card.kw.length
     ? `<p class="zKw">${card.kw.map(k=>KWDESC[k]).join("<br>")}</p>` : "";
   const descHtml = card.d ? `<p>${card.d}</p>` : "";
@@ -1563,6 +1692,7 @@ function showHelp(){
   <p><b>Each turn:</b> both players draw 1 card and gain resources (🔷 mana for the Otherworld, 📜 decrees for the Regime) equal to the turn number (max 10). Unspent resources are lost.</p>
   <p><b>Phase order:</b> 1) Regime plays minions → 2) Otherworld plays everything → 3) Regime plays tricks → 4) Combat.</p>
   <p><b>Combat:</b> lanes resolve left to right. In each occupied lane both minions swing at the same time — it's a real trade, so both can deal damage and both can die. A minion hits the hero directly if its lane is open.</p>
+  <p><b>Environments:</b> 🌍 played onto a lane itself, not either side — tap any card in that lane column to drop it there. Right before combat resolves in that lane, the environment triggers its effect on whatever's occupying it, then the fight happens. Playing a new environment on a lane that already has one replaces (voids) the old one — no undo. Currently just a colored floor tint; real art is coming later.</p>
   <p><b>Keywords:</b><br>${Object.values(KWDESC).join("<br>")}<br><i>A minion that dies in the trade does NOT get its Strikethrough or Frenzy hit — survivors only.</i></p>
   <p><b>Factions:</b> The Otherworld is tougher and can heal. The Regime hits harder and has area damage.</p>
   <p><b>Decks:</b> every deck is exactly 40 cards with at most 4 copies of any card. Build your own in the 🃏 Deck Builder on the home screen and pick it when starting a game.</p>
@@ -1648,7 +1778,7 @@ function renderDeckList(){
       <button class="btn dNewBtn" data-side="${side}">＋ New deck</button>`;
   };
   $("deckBody").innerHTML =
-    `<p class="deckRules">Decks are exactly ${DECK_SIZE} cards, max ${MAX_COPIES} copies of any card. <span class="coreLegend"><span class="coreSwatch"></span>Core Set — you own 4 copies</span></p>`+
+    `<p class="deckRules">Decks are exactly ${DECK_SIZE} cards, max ${MAX_COPIES} copies of any card. <span class="coreLegend"><span class="coreSwatch"></span>Core Set — the ×4 badge shows what you own</span></p>`+
     section("plant","⚔️ Otherworld") + section("zombie","🎖️ Regime");
 }
 /* always-visible summary of what's actually in the deck right now — separate from
@@ -1680,12 +1810,15 @@ function renderDeckEditor(){
   const deck=getDeck(side,id);
   const ro=!!deck.starter;
   const ct=deckCount(deck.cards);
-  let minions=0,tricks=0;
-  Object.entries(deck.cards).forEach(([n,c])=>{ if(ALL_CARDS[n]) (ALL_CARDS[n].t==="m"?minions+=c:tricks+=c); });
+  let minions=0,tricks=0,envs=0;
+  Object.entries(deck.cards).forEach(([n,c])=>{
+    const cd=ALL_CARDS[n]; if(!cd) return;
+    if(cd.t==="m") minions+=c; else if(cd.t==="e") envs+=c; else tricks+=c;
+  });
   $("deckTitle").textContent=deck.name;
   const meta=`<div class="deckMeta">
       <span class="pill ${ct===DECK_SIZE?'ok':'bad'}">🃏 ${ct}/${DECK_SIZE}</span>
-      <span class="pill">⚔ ${minions} minions</span><span class="pill">✨ ${tricks} tricks</span>
+      <span class="pill">⚔ ${minions} minions</span><span class="pill">✨ ${tricks} tricks</span><span class="pill">🌍 ${envs} environments</span>
     </div>
     <div class="deckActions">${ro
       ? `<button class="btn small" id="dCopyBtn">📋 Copy to new deck</button><span class="dTag">Starter — view only</span>`
@@ -1701,7 +1834,7 @@ function renderDeckEditor(){
           <button class="ctlBtn" data-n="${escapeHtml(c.n)}" data-d="1"${(n>=MAX_COPIES||ct>=DECK_SIZE)?' disabled':''}>＋</button>
         </div>`;
     return `<div class="deckCardWrap${n?' inDeck':''}">
-      <div class="card${side==="zombie"?' zSide':''}${isCoreCard(c.n)?' coreCard':''}" data-name="${escapeHtml(c.n)}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}${n?`<div class="haveBadge">×${n}</div>`:""}</div>
+      <div class="card${side==="zombie"?' zSide':''}${isCoreCard(c.n)?' coreCard':''}" data-name="${escapeHtml(c.n)}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}${coreBadgeHtml(c.n)}${n?`<div class="haveBadge">×${n}</div>`:""}</div>
       ${ctl}</div>`;
   }).join("");
   $("deckBody").innerHTML=`<div class="deckEditorLayout">${deckContentsHtml(side,deck,ro)}<div class="deckPoolArea">${meta}<div class="compGrid deckGrid">${grid}</div></div></div>`;
