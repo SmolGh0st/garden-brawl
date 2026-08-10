@@ -244,6 +244,7 @@
   .card.unplayable { opacity:0.62; filter:grayscale(0.65) brightness(0.8); }
   .card.unplayable::after { content:"🔒"; position:absolute; top:2px; right:3px; font-size:11px; filter:none; text-shadow:0 1px 2px #000; }
   .card.selected { border-color:#ffd75e; box-shadow:0 0 10px #ffd75e77; transform:translateY(-6px); }
+  .card.validHandTarget { border-color:#7fe06d; border-style:solid; box-shadow:0 0 8px #7fe06d66; }
   .card .cost {
     position:absolute; top:-6px; left:-5px; width:20px; height:20px; z-index:2;
     background:linear-gradient(135deg,#f5dd7a,#c9a437); color:#221c07;
@@ -294,7 +295,7 @@
   #compendiumScreen .screenBody, #deckScreen .screenBody { flex:1; min-height:0; overflow-y:auto; padding:12px 12px 24px; -webkit-overflow-scrolling:touch; }
   .compSectionTitle { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:#9ecf7f; margin:0 0 8px; }
   .compSectionTitle.zombieSection { color:#c9a2ff; margin-top:18px; }
-  .compGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:8px; }
+  .compGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:8px 14px; }
   #compendiumScreen .card { flex:none; height:auto; min-height:118px; }
   #compendiumScreen .card .cDesc { overflow:visible; }
   /* the compendium is reachable before any turn sets body[data-active], so its cards
@@ -634,7 +635,9 @@ const PLANT_POOL = [
   T("Lay on Hands","🙏",2,{k:"heal",n:4},"Restore 4 HP to your hero (max 20)"), // NEW — the Otherworld alone can heal
   T("Banish","🌀",5,{k:"destroy"},"Destroy a Regime minion"),
   E("Blooming Grove","🌿",2,{k:"envAllHp",n:2},"When combat reaches this lane: give the minion(s) here +2 HP, on either side","common"),
-  E("Chilling Mist","❄️",3,{k:"envEnemyAtk",n:-1},"When combat reaches this lane: give the Regime minion here -1 Attack","common")
+  E("Chilling Mist","❄️",3,{k:"envEnemyAtk",n:-1},"When combat reaches this lane: give the Regime minion here -1 Attack","common"),
+  T("Honed Blade","🔪✨",1,{k:"buffHand",stat:"a",n:1},"Give a minion in your hand +1 Attack","rare"),
+  T("Traveler's Ward","🧭",1,{k:"buffHand",stat:"hp",n:1},"Give a minion in your hand +1 HP","rare")
 ];
 /* the "Regime" faction — history / government-systems theme */
 const ZOMBIE_POOL = [
@@ -655,7 +658,9 @@ const ZOMBIE_POOL = [
   T("Purge","🩸",2,{k:"aoe",n:1},"Deal 1 damage to ALL Otherworld minions"), // NEW — regime alone gets AoE
   T("Show Trial","⚖️",5,{k:"destroy"},"Destroy an Otherworld minion"),
   E("Scorched Earth","🔥",2,{k:"envAllAtk",n:2},"When combat reaches this lane: give the minion(s) here +2 Attack, on either side","common"),
-  E("Toxic Fallout","☣️",3,{k:"envEnemyHp",n:-1},"When combat reaches this lane: give the Otherworld minion here -1 HP","common")
+  E("Toxic Fallout","☣️",3,{k:"envEnemyHp",n:-1},"When combat reaches this lane: give the Otherworld minion here -1 HP","common"),
+  T("Combat Drills","🎯",1,{k:"buffHand",stat:"a",n:1},"Give a minion in your hand +1 Attack","rare"),
+  T("Field Rations","🍞",1,{k:"buffHand",stat:"hp",n:1},"Give a minion in your hand +1 HP","rare")
 ];
 /* lookup by name for the Compendium's zoomed-in card view */
 const ALL_CARDS = {};
@@ -876,12 +881,24 @@ function canPlayCard(card){
   if(fx.k==="destroy") return S.lanes.some(l=>l[otherSide(S.active)]);
   if(fx.k==="aoe") return S.lanes.some(l=>l[otherSide(S.active)]);
   if(fx.k==="heal") return P(S.active).hp<20;
+  if(fx.k==="buffHand") return P(S.active).hand.some(c=>c!==card && c.t==="m");
   return true; // dmg (hero always targetable), draw
 }
 function onCardTap(i){
   if(uiLock||S.over||S.phase==="combat") return;
-  const card=P(S.active).hand[i];
+  const hand=P(S.active).hand;
+  const card=hand[i];
   if(!card) return;
+  // a hand-targeting trick is already selected — tapping a DIFFERENT minion in hand
+  // casts it there, instead of switching the selection to that card
+  if(S.sel!==null && S.sel!==i){
+    const selCard=hand[S.sel];
+    if(selCard && selCard.t==="t" && selCard.fx.k==="buffHand"){
+      if(card.t==="m") castTrick(S.sel,{handCardRef:card});
+      else cancelSel();
+      return;
+    }
+  }
   if(!canPlayCard(card)){
     if(card.c>P(S.active).res) hint("Not enough "+(S.active==="plant"?"mana 🔷":"decrees 📜"));
     else if(S.phase==="z1"&&card.t==="t") hint("Tricks come later this turn");
@@ -1006,6 +1023,17 @@ function castTrick(idx,target){
     if(m){ addLog(`${m.e}${m.n} destroyed!`); floaterAtCell(target.lane,target.side,"💥","#ff6b6b"); S.lanes[target.lane][target.side]=null; }
   }
   else if(fx.k==="scry"){ startScry(side, fx.n); return; } // scry renders its own overlay; skip the trailing render() below
+  else if(fx.k==="buffHand"){
+    // target is a reference to the actual hand-card object (captured before this trick
+    // was spliced out), NOT an index — splicing the trick out shifts later indices, but
+    // object identity in the array survives that untouched
+    const t=P(side).hand.find(c=>c===target.handCardRef);
+    if(t){
+      if(fx.stat==="a") t.a=(t.a||0)+fx.n;
+      else t.h=(t.h||0)+fx.n;
+      addLog(`${card.e}${card.n} gives ${t.e}${t.n} in hand +${fx.n} ${fx.stat==="a"?"Attack":"HP"}`);
+    }
+  }
   render();
 }
 
@@ -1506,6 +1534,7 @@ function render(){
     else if(selCard.fx.k==="dmg") hint("Tap an enemy minion or the enemy hero · tap elsewhere to cancel");
     else if(selCard.fx.k==="buff") hint("Tap one of your minions · tap elsewhere to cancel");
     else if(selCard.fx.k==="destroy") hint("Tap an enemy minion · tap elsewhere to cancel");
+    else if(selCard.fx.k==="buffHand") hint("Tap a minion in your hand to buff it · tap elsewhere to cancel");
     else hint("Tap the card again to cast");
   } else if(S.phase==="combat") hint("Lanes fight left to right — minions trade simultaneously");
   else hint("Tap a card to play it, or end the phase");
@@ -1570,11 +1599,14 @@ function cardFaceMarkup(card){
 function renderHand(selCard){
   const handEl=$("hand"); handEl.innerHTML="";
   if(S.phase==="combat"||S.over||S.handoff||isAiTurn()){ updateHandFade(); return; } // AI's hand stays hidden
+  const buffHandSel = selCard && selCard.t==="t" && selCard.fx.k==="buffHand";
   P(S.active).hand.forEach((card,i)=>{
     const el=document.createElement("div");
     el.className="card";
     if(!canPlayCard(card)) el.classList.add("unplayable");
     if(S.sel===i) el.classList.add("selected");
+    // while a hand-buff trick is selected, spotlight the other minions it can target
+    if(buffHandSel && i!==S.sel && card.t==="m") el.classList.add("validHandTarget");
     el.innerHTML=cardFaceMarkup(card);
     el.onclick=()=>onCardTap(i);
     handEl.appendChild(el);
