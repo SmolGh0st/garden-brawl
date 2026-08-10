@@ -390,6 +390,7 @@
   <div id="logBar"></div>
   <div id="handWrap"><div id="hand"></div></div>
   <div id="controls">
+    <button class="btn small" id="homeBtn" title="Main Menu">🏠</button>
     <button class="btn small" id="helpBtn">?</button>
     <button class="btn small hidden" id="mullBtn">🔄 Mulligan</button>
     <button class="btn" id="endBtn">End Phase</button>
@@ -1129,6 +1130,15 @@ function gameOver(winner){
   $("menuBtn").onclick=()=>{ $("overlay").classList.add("hidden"); S=null; showScreen("homeScreen"); };
   render();
 }
+/* Home mid-match: game autosaves every render, so this is a plain jump back to the
+   menu, not a "new game" — Resume Game picks the match right back up. */
+function goHome(){
+  if(uiLock){ hint("Wait for combat to finish first"); return; }
+  saveGame();
+  $("resumeBtn").classList.remove("hidden");
+  S=null;
+  showScreen("homeScreen");
+}
 function confirmNewGame(){
   if(uiLock){ hint("Wait for combat to finish first"); return; }
   $("overlayCard").innerHTML=`<div class="big">⚠️</div><h2>Start a new game?</h2><p>This ends the current match for both players — no undo.</p><div class="confirmRow"><button id="cancelNewBtn" class="secondary">Cancel</button><button id="confirmNewBtn" class="danger">New Game</button></div>`;
@@ -1171,6 +1181,7 @@ function showScreen(id){
 /* ============ WIRE UP ============ */
 $("endBtn").onclick=endPhase;
 $("newBtn").onclick=confirmNewGame;
+$("homeBtn").onclick=goHome;
 $("hand").addEventListener("scroll",updateHandFade);
 $("helpBtn").onclick=showHelp;
 $("hintBar").onclick=cancelSel;
