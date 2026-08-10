@@ -920,9 +920,10 @@ function gameOver(winner){
   const face=winner==="plant"?"🌻":"🎖️";
   const heading=winner==="plant"?"Plants win!":"The Regime wins!";
   const flavor=winner==="plant"?"The garden is safe.":"The Regime holds absolute power.";
-  $("overlayCard").innerHTML=`<div class="big">${face}</div><h2>${heading}</h2><p>${flavor} GG!</p><button id="againBtn">Play Again</button>`;
+  $("overlayCard").innerHTML=`<div class="big">${face}</div><h2>${heading}</h2><p>${flavor} GG!</p><div class="confirmRow"><button id="menuBtn" class="secondary">🏠 Main Menu</button><button id="againBtn">Play Again</button></div>`;
   $("overlay").classList.remove("hidden");
   $("againBtn").onclick=()=>{ $("overlay").classList.add("hidden"); newGame(); };
+  $("menuBtn").onclick=()=>{ $("overlay").classList.add("hidden"); S=null; showScreen("homeScreen"); };
   render();
 }
 function confirmNewGame(){
