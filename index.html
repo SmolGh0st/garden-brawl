@@ -231,6 +231,15 @@
     display:flex; flex-direction:column; align-items:center; position:relative;
   }
   body[data-active="zombie"] .card { background:linear-gradient(180deg,#3a2f47,#201827); border-color:#c9a2ff42; }
+  /* rarity border accents (common = the plain faction-tinted look above, unchanged).
+     !important on border-color because plainer, higher-specificity context rules
+     (compendium/deck-builder ID-scoped faction tints below) would otherwise win —
+     rarity should read the same color everywhere a card shows up. The interaction
+     states just below (unplayable/selected/validHandTarget) get their own
+     !important so they still visibly take over on top of a rare+ card in hand. */
+  .card.rarity-rare { border-color:#4aa8ff !important; box-shadow:0 2px 6px #0007, inset 0 1px 0 #ffffff14, 0 0 6px #4aa8ff66; }
+  .card.rarity-epic { border-color:#c964f0 !important; box-shadow:0 2px 6px #0007, inset 0 1px 0 #ffffff14, 0 0 6px #c964f066; }
+  .card.rarity-legendary { border-color:#ff9645 !important; border-width:2px; box-shadow:0 2px 6px #0007, inset 0 1px 0 #ffffff14, 0 0 8px #ff964588; }
   /* art window: shows a mapped custom image if one exists, otherwise the card's emoji */
   .card .cArt {
     width:calc(100% - 6px); height:38px; margin-top:6px; border-radius:6px; flex:0 0 auto;
@@ -243,8 +252,8 @@
   .cell img.mArt { width:34px; height:34px; border-radius:50%; object-fit:cover; border:1px solid #ffffff2e; }
   .card.unplayable { opacity:0.62; filter:grayscale(0.65) brightness(0.8); }
   .card.unplayable::after { content:"🔒"; position:absolute; top:2px; right:3px; font-size:11px; filter:none; text-shadow:0 1px 2px #000; }
-  .card.selected { border-color:#ffd75e; box-shadow:0 0 10px #ffd75e77; transform:translateY(-6px); }
-  .card.validHandTarget { border-color:#7fe06d; border-style:solid; box-shadow:0 0 8px #7fe06d66; }
+  .card.selected { border-color:#ffd75e !important; box-shadow:0 0 10px #ffd75e77; transform:translateY(-6px); }
+  .card.validHandTarget { border-color:#7fe06d !important; border-style:solid; box-shadow:0 0 8px #7fe06d66; }
   .card .cost {
     position:absolute; top:-6px; left:-5px; width:20px; height:20px; z-index:2;
     background:linear-gradient(135deg,#f5dd7a,#c9a437); color:#221c07;
@@ -701,6 +710,10 @@ function ownedCopies(name){ return isCoreCard(name) ? MAX_COPIES_OWNED : 0; }
    (top-left, mana cost) was easy to mistake for a copies-owned count since nothing
    else showed that number on the card face. This sits opposite it, top-right. */
 function coreBadgeHtml(name){ return isCoreCard(name) ? `<div class="ownBadge">×${MAX_COPIES_OWNED}</div>` : ""; }
+/* rarity border — common cards (the vast majority, including unset/undefined `r`)
+   get no extra class and keep the plain faction-tinted card look; rare/epic/legendary
+   get a colored border via the matching .rarity-X CSS rule, wherever the card renders */
+function rarityClass(card){ return (card.r && card.r!=="common") ? ` rarity-${card.r}` : ""; }
 
 /* ============ DECKS ============ */
 /* PvZ-Heroes-style deckbuilding: every deck is exactly 40 cards, max 4 copies of
@@ -1111,7 +1124,7 @@ function showScryPicker(side,revealed){
   oc.style.maxWidth="440px"; // wider than the default 340px so revealed cards fit in a row
   oc.innerHTML =
     `<h2>🔮 Scry ${revealed.length}</h2><p class="scryHint">Pick one to keep — the rest shuffle back into the deck.</p>`+
-    `<div class="scryRow">${revealed.map((c,i)=>`<div class="card scryCard" data-i="${i}">${cardFaceMarkup(c)}</div>`).join("")}</div>`;
+    `<div class="scryRow">${revealed.map((c,i)=>`<div class="card scryCard${rarityClass(c)}" data-i="${i}">${cardFaceMarkup(c)}</div>`).join("")}</div>`;
   oc.querySelectorAll(".scryCard").forEach(el=>{
     el.onclick=()=>resolveScry(side,revealed,+el.dataset.i);
   });
@@ -1636,7 +1649,7 @@ function renderHand(selCard){
   const transfigureSel = selCard && selCard.t==="t" && selCard.fx.k==="transfigure";
   P(S.active).hand.forEach((card,i)=>{
     const el=document.createElement("div");
-    el.className="card";
+    el.className="card"+rarityClass(card);
     if(!canPlayCard(card)) el.classList.add("unplayable");
     if(S.sel===i) el.classList.add("selected");
     // while a hand-buff trick is selected, spotlight the other minions it can target
@@ -1654,8 +1667,8 @@ function renderHand(selCard){
 let compendiumBuilt=false;
 function renderCompendium(){
   if(compendiumBuilt) return;
-  $("compPlantGrid").innerHTML = PLANT_POOL.map(c=>`<div class="card${isCoreCard(c.n)?' coreCard':''}" data-name="${c.n}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}${coreBadgeHtml(c.n)}</div>`).join("");
-  $("compZombieGrid").innerHTML = ZOMBIE_POOL.map(c=>`<div class="card zSide${isCoreCard(c.n)?' coreCard':''}" data-name="${c.n}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}${coreBadgeHtml(c.n)}</div>`).join("");
+  $("compPlantGrid").innerHTML = PLANT_POOL.map(c=>`<div class="card${rarityClass(c)}${isCoreCard(c.n)?' coreCard':''}" data-name="${c.n}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}${coreBadgeHtml(c.n)}</div>`).join("");
+  $("compZombieGrid").innerHTML = ZOMBIE_POOL.map(c=>`<div class="card zSide${rarityClass(c)}${isCoreCard(c.n)?' coreCard':''}" data-name="${c.n}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}${coreBadgeHtml(c.n)}</div>`).join("");
   compendiumBuilt=true;
 }
 /* zoomed-in card view: bigger art, full stats, and a flavor quote if one exists */
@@ -1906,7 +1919,7 @@ function renderDeckEditor(){
           <button class="ctlBtn" data-n="${escapeHtml(c.n)}" data-d="1"${(n>=MAX_COPIES||ct>=DECK_SIZE)?' disabled':''}>＋</button>
         </div>`;
     return `<div class="deckCardWrap${n?' inDeck':''}">
-      <div class="card${side==="zombie"?' zSide':''}${isCoreCard(c.n)?' coreCard':''}" data-name="${escapeHtml(c.n)}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}${coreBadgeHtml(c.n)}${n?`<div class="haveBadge">×${n}</div>`:""}</div>
+      <div class="card${side==="zombie"?' zSide':''}${rarityClass(c)}${isCoreCard(c.n)?' coreCard':''}" data-name="${escapeHtml(c.n)}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}${coreBadgeHtml(c.n)}${n?`<div class="haveBadge">×${n}</div>`:""}</div>
       ${ctl}</div>`;
   }).join("");
   $("deckBody").innerHTML=`<div class="deckEditorLayout">${deckContentsHtml(side,deck,ro)}<div class="deckPoolArea">${meta}<div class="compGrid deckGrid">${grid}</div></div></div>`;
