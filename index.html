@@ -357,6 +357,12 @@
      already used everywhere else a Regime card/side shows up (hand cards, buttons, etc.) */
   #overlayCard.zSide { background:#241c30; border-color:#c9a2ff42; }
   #overlayCard.zSide button:not(.secondary):not(.danger) { background:linear-gradient(180deg,#7a5aa0,#5a3f7a); }
+  /* carry the card's rarity border into the zoomed-in view too, same colors as the
+     .card.rarity-X rules — !important for the same reason: it must win over the
+     plain/zSide background rule above regardless of selector order */
+  #overlayCard.rarity-rare { border-color:#4aa8ff !important; box-shadow:0 0 16px #4aa8ff44; }
+  #overlayCard.rarity-epic { border-color:#c964f0 !important; box-shadow:0 0 16px #c964f044; }
+  #overlayCard.rarity-legendary { border-width:2px; border-color:#ff9645 !important; box-shadow:0 0 20px #ff964566; }
   #overlayCard .help { text-align:left; font-size:11.5px; }
   #overlayCard .confirmRow { display:flex; gap:8px; margin-top:14px; }
   #overlayCard .confirmRow button { flex:1; margin-top:0; }
@@ -1691,6 +1697,11 @@ function zoomCard(card){
   // the Otherworld's green — same lookup used to tint compendium/deckbuilder cards
   const zombieCard = ZOMBIE_POOL.some(c=>c.n===card.n);
   $("overlayCard").classList.toggle("zSide", zombieCard);
+  // carry the card's rarity border into the zoomed view too — clear any rarity class
+  // left over from a previous zoom before applying this card's own (if it has one)
+  $("overlayCard").classList.remove("rarity-rare","rarity-epic","rarity-legendary");
+  const rc=rarityClass(card).trim();
+  if(rc) $("overlayCard").classList.add(rc);
   $("overlayCard").innerHTML = `
     <div class="zArt">${artHtml}</div>
     <h2>${card.n}</h2>
@@ -1698,7 +1709,11 @@ function zoomCard(card){
     ${kwHtml}${descHtml}${flavorHtml}
     <button id="closeZoom">Close</button>`;
   $("overlay").classList.remove("hidden");
-  $("closeZoom").onclick=()=>{ $("overlay").classList.add("hidden"); $("overlayCard").classList.remove("zSide"); if(S) render(); };
+  $("closeZoom").onclick=()=>{
+    $("overlay").classList.add("hidden");
+    $("overlayCard").classList.remove("zSide","rarity-rare","rarity-epic","rarity-legendary");
+    if(S) render();
+  };
 }
 /* tapping a minion already on the board (no card selected) opens the same zoomed
    view as the compendium — base card info (cost/keyword text/flavor) merged with
