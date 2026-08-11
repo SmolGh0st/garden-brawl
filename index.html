@@ -419,6 +419,13 @@
   .deckRules { font-size:11px; color:#9aa88f; margin:0 0 12px; }
   .coreLegend { display:inline-flex; align-items:center; gap:4px; margin-left:6px; }
   .coreSwatch { width:12px; height:12px; border-radius:4px; background:#2f3d2a; box-shadow:0 0 0 2px #d4d4d4; display:inline-block; }
+  /* dev-only testing toggle — deliberately styled to look like a tool, not a normal
+     game control: dashed border, monospace-ish, muted until switched on */
+  .devBtn {
+    display:block; margin:0 0 14px; font-size:11px; padding:6px 10px;
+    background:#ffffff08; border:1px dashed #ffffff33; color:#9aa88f;
+  }
+  .devBtn.devOn { background:#7fe06d22; border-color:#7fe06d88; color:#c9f5be; }
   .deckRow {
     display:flex; align-items:center; gap:10px; padding:11px 12px; margin-bottom:8px;
     background:#ffffff0a; border:1px solid #ffffff1c; border-radius:12px; cursor:pointer;
@@ -549,6 +556,7 @@
   </div>
   <div class="screenBody">
     <p class="deckRules"><span class="coreLegend"><span class="coreSwatch"></span>Core Set — the ×4 badge shows what you own</span></p>
+    <button class="btn small devBtn" id="devUnlockBtn" title="Testing only — marks every card as owned, everywhere it's shown">🔒 Dev: Unlock All (OFF)</button>
     <h3 class="compSectionTitle plantSection">⚔️ Otherworld</h3>
     <div class="compGrid" id="compPlantGrid"></div>
     <h3 class="compSectionTitle zombieSection">🎖️ Regime</h3>
@@ -633,7 +641,7 @@
    name to its path here. Any card without an entry keeps its emoji. Square-ish images look
    best (cropped to fit). Small thumbnails also appear on the board when the minion is placed.
    Example:  const CARD_ART = { "Foot Soldier":"art/foot-soldier.png", "Nut Wall":"art/nut-wall.jpg" };  */
-const CARD_ART = { "Communist Manifesto":"art/communist-manifesto.png" };
+const CARD_ART = { "Communist Manifesto":"art/communist-manifesto.png", "Blessing":"art/blessing.png" };
 function artFor(name){ return CARD_ART[name] || null; }
 
 /* CARD FLAVOR
@@ -775,7 +783,27 @@ const CORE_SET = new Set([
   "Saboteur","Shock Trooper","Riot Police","Cavalry Charge","Iron Curtain",
   "Communist Manifesto","Blitzkrieg","Requisition","Purge","Show Trial"
 ]);
-function isCoreCard(name){ return CORE_SET.has(name); }
+/* DEV UNLOCK — a testing-only toggle (Compendium button), not a real progression
+   system. While on, every card in the game (Environments, the Rare hand-buff
+   tricks, anything added later) reads as "owned" the same way Core Set cards do,
+   so ownership never gets in the way of testing new content. Persisted across
+   reloads via localStorage so it doesn't need re-toggling every session; entirely
+   separate from CORE_SET itself, which stays untouched as the real baseline. */
+let DEV_UNLOCK_ALL = localStorage.getItem('gbDevUnlockAll') === '1';
+function toggleDevUnlock(){
+  DEV_UNLOCK_ALL = !DEV_UNLOCK_ALL;
+  localStorage.setItem('gbDevUnlockAll', DEV_UNLOCK_ALL ? '1' : '0');
+  compendiumBuilt = false; // force the compendium grids to rebuild with the new badge state
+  renderCompendium();
+  updateDevUnlockBtn();
+  if(deckEd && !$("deckScreen").classList.contains("hidden")) renderDeckEditor();
+}
+function updateDevUnlockBtn(){
+  const btn = $("devUnlockBtn"); if(!btn) return;
+  btn.textContent = DEV_UNLOCK_ALL ? "🔓 Dev: Unlock All (ON)" : "🔒 Dev: Unlock All (OFF)";
+  btn.classList.toggle("devOn", DEV_UNLOCK_ALL);
+}
+function isCoreCard(name){ return DEV_UNLOCK_ALL || CORE_SET.has(name); }
 const MAX_COPIES_OWNED = 4;
 /* how many of a card we own — everything in the Core Set is owned at the deck-build
    cap (4); future non-core cards default to 0 until an unlock system exists. Used
@@ -2149,6 +2177,8 @@ $("compendiumScreen").querySelector(".screenBody").addEventListener("click", e=>
   if(card) zoomCard(card);
 });
 $("compBackBtn").onclick=()=>showScreen("homeScreen");
+$("devUnlockBtn").onclick=toggleDevUnlock;
+updateDevUnlockBtn();
 if(loadSave()) $("resumeBtn").classList.remove("hidden");
 showScreen("homeScreen");
 </script>
