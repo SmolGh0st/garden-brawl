@@ -339,7 +339,14 @@
   }
   .card .cost span { transform:rotate(-45deg); }
   .card .cName { font-size:8.5px; font-weight:700; text-align:center; line-height:1.1; margin-top:3px; width:calc(100% - 4px); background:#00000042; border-radius:4px; padding:1px 2px; }
-  .card .cDesc { font-size:7.5px; text-align:center; color:#b8c4a8; line-height:1.15; margin-top:1px; flex:1; overflow:hidden; }
+  /* the fixed-size compact hand card can't fit every card's full description (the
+     Environments in particular run long) — clamp to 2 lines with a trailing ellipsis
+     instead of hard-clipping mid-sentence, and hold the card to read the rest via
+     zoomCard (see the long-press handling in the drag controller further down) */
+  .card .cDesc {
+    font-size:7.5px; text-align:center; color:#b8c4a8; line-height:1.15; margin-top:1px; flex:1;
+    overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+  }
   .card .cStats { font-size:10px; font-weight:800; display:flex; gap:6px; }
   .card .cStats .a { color:#ffb95e; } .card .cStats .h { color:#7fe06d; }
   .card .trickTag { font-size:7.5px; color:#c9a2ff; font-weight:700; }
@@ -382,7 +389,7 @@
   .compSectionTitle.zombieSection { color:#c9a2ff; margin-top:18px; }
   .compGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:14px; }
   #compendiumScreen .card { flex:none; height:auto; min-height:118px; }
-  #compendiumScreen .card .cDesc { overflow:visible; }
+  #compendiumScreen .card .cDesc { overflow:visible; display:block; -webkit-line-clamp:unset; }
   /* the compendium is reachable before any turn sets body[data-active], so its cards
      must not depend on that leftover attribute — state their own colors outright */
   #compendiumScreen #compPlantGrid .card { background:linear-gradient(180deg,#2f3d2a,#182016); border-color:#8fbf7a4d; }
@@ -479,7 +486,7 @@
   .deckActions .btn.danger { background:linear-gradient(180deg,#c0524f,#8a3a37); box-shadow:0 2px 0 #5a2422; }
   .deckCardWrap { display:flex; flex-direction:column; gap:4px; }
   .deckCardWrap .card { flex:none; height:auto; min-height:118px; opacity:0.55; }
-  .deckCardWrap .card .cDesc { overflow:visible; }
+  .deckCardWrap .card .cDesc { overflow:visible; display:block; -webkit-line-clamp:unset; }
   .deckCardWrap.inDeck .card { opacity:1; border-color:#ffd75e88; }
   #deckScreen .card { background:linear-gradient(180deg,#2f3d2a,#182016); border-color:#8fbf7a4d; }
   #deckScreen .card.zSide { background:linear-gradient(180deg,#3a2f47,#201827); border-color:#c9a2ff42; }
@@ -1127,12 +1134,31 @@ function dragEligible(card){
   if(card.t==="m"||card.t==="e") return true;
   return card.t==="t" && DRAG_ELIGIBLE_FX.has(card.fx.k);
 }
+const LONG_PRESS_MS = 450; // holding a hand card this long (without dragging) opens its full-text zoom view
 let dragCand=null;
+// consumed by the next click on a hand card — set right when a long-press zoom fires, so
+// the click that follows pointerup doesn't also re-trigger onCardTap's select/cast logic
+let suppressNextHandClick=false;
 function startCardDrag(e,index,el){
   if(dragCand||uiLock||S.over||S.phase==="combat"||isAiTurn()) return;
   const card=P(S.active).hand[index];
-  if(!card||!dragEligible(card)) return;
-  dragCand={index,el,startX:e.clientX,startY:e.clientY,pointerId:e.pointerId,dragging:false,cloneEl:null,hoverEls:null,liveEl:null};
+  if(!card) return;
+  // every hand card gets a long-press timer, even ones that aren't draggable (self-cast
+  // tricks like Divination) — reading a card's full text shouldn't require it to also be
+  // playable via drag
+  dragCand={index,el,startX:e.clientX,startY:e.clientY,pointerId:e.pointerId,pointerType:e.pointerType,dragging:false,cloneEl:null,hoverEls:null,liveEl:null,longPressed:false,eligible:dragEligible(card)};
+  const cand=dragCand;
+  cand.longPressTimer=setTimeout(()=>{
+    if(dragCand!==cand||cand.dragging) return; // already dragging or gesture already ended
+    cand.longPressed=true;
+    suppressNextHandClick=true;
+    // the zoom overlay covers the card the instant it opens, so the click that would
+    // otherwise follow pointerup usually can't even hit the card to consume this flag
+    // itself (hit-tests the overlay instead) — clear it shortly after rather than relying
+    // on a click that may never arrive, so a later, unrelated tap is never swallowed
+    setTimeout(()=>{ suppressNextHandClick=false; },150);
+    zoomCard(card);
+  },LONG_PRESS_MS);
   // listeners live on `document`, not the card element itself — selecting the card
   // (below, once the drag threshold is crossed) triggers a render() that rebuilds the
   // whole hand strip and detaches the original card node, which would silently kill
@@ -1143,9 +1169,11 @@ function startCardDrag(e,index,el){
 }
 function onCardDragMove(e){
   const cand=dragCand;
-  if(!cand||e.pointerId!==cand.pointerId) return;
+  if(!cand||e.pointerId!==cand.pointerId||cand.longPressed) return; // long-press already opened the zoom view — ignore further movement
   if(!cand.dragging){
     if(Math.hypot(e.clientX-cand.startX,e.clientY-cand.startY)<10) return; // still ambiguous — could be a tap, or (on the hand strip) a horizontal scroll
+    clearTimeout(cand.longPressTimer); // real movement — this is a drag/scroll, not a hold
+    if(!cand.eligible) return; // self-cast tricks etc. still get long-press-to-zoom, just not dragging
     beginCardDrag(cand);
     if(!cand.dragging) return; // unplayable card — onCardTap already showed the hint
   }
@@ -1221,6 +1249,7 @@ function onCardDragCancel(e){
   endCardDrag(cand,false);
 }
 function endCardDrag(cand,resolveTarget,x,y){
+  clearTimeout(cand.longPressTimer);
   document.removeEventListener("pointermove",onCardDragMove);
   document.removeEventListener("pointerup",onCardDragEnd);
   document.removeEventListener("pointercancel",onCardDragCancel);
@@ -1998,7 +2027,10 @@ function renderHand(selCard){
       el.classList.add("unplayable");
     }
     el.innerHTML=cardFaceMarkup(card);
-    el.onclick=()=>onCardTap(i);
+    // a long-press (see startCardDrag) opens this card's full-text zoom view instead of
+    // selecting/casting it — suppressNextHandClick swallows the click that still follows
+    // the pointerup afterward, so it doesn't also trigger onCardTap
+    el.onclick=()=>{ if(suppressNextHandClick){ suppressNextHandClick=false; return; } onCardTap(i); };
     el.addEventListener("pointerdown",e=>startCardDrag(e,i,el));
     handEl.appendChild(el);
   });
@@ -2133,7 +2165,7 @@ function showHelp(){
   <p><b>Factions:</b> The Otherworld is tougher and can heal. The Regime hits harder and has area damage.</p>
   <p><b>Decks:</b> every deck is exactly 40 cards with at most 4 copies of any card. Build your own in the 🃏 Deck Builder on the home screen and pick it when starting a game.</p>
   <p><b>Mulligan:</b> on turn 1, each player may redraw their whole hand once — before playing anything.</p>
-  <p><b>Tips:</b> tap the small log line to see the full battle history. A game in progress is saved automatically — if the page closes, use Resume on the home screen.</p>
+  <p><b>Tips:</b> tap the small log line to see the full battle history. Hold down on a card in your hand to read its full text if it's cut off. A game in progress is saved automatically — if the page closes, use Resume on the home screen.</p>
   <p><b>Hotseat:</b> pass the phone at each phase-change screen so hands stay secret.</p>
   <p><b>Vs AI:</b> in a solo game the AI plays its phases by itself — watch the board and the log to see its moves.</p></div><button id="closeHelp">Close</button>`;
   $("overlay").classList.remove("hidden");
