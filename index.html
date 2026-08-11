@@ -484,6 +484,20 @@
   #overlayCard button.secondary { background:linear-gradient(180deg,#555,#3a3a3a); }
   #overlayCard button.danger { background:linear-gradient(180deg,#c0524f,#8a3a37); }
 
+  /* mulligan overlay: whole hand floats front-and-center so the option (and what it does)
+     is impossible to miss, each card individually tappable to mark it for redraw */
+  #overlayCard.mullModal { max-width:480px; }
+  .mullGrid { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin:14px 0 2px; }
+  .mullGrid .card.mullCard { flex:0 0 78px; height:112px; cursor:pointer; transition:transform .12s; }
+  .mullGrid .card.mullCard:hover { transform:translateY(-3px); }
+  .mullGrid .card.mullCard.toRedraw { border-color:#ff8a65 !important; opacity:0.55; filter:grayscale(0.5); box-shadow:0 0 10px #ff8a6555; }
+  .mullMark { position:absolute; top:-8px; left:50%; transform:translateX(-50%); z-index:2; white-space:nowrap;
+    background:#ff8a65; color:#3a1a10; font-size:10px; font-weight:800; border-radius:8px; padding:2px 7px; box-shadow:0 1px 3px #000c; }
+
+  @media (max-width:420px){
+    .mullGrid .card.mullCard { flex:0 0 68px; height:98px; }
+  }
+
   /* deck builder */
   .deckRules { font-size:11px; color:#9aa88f; margin:0 0 12px; }
   .coreLegend { display:inline-flex; align-items:center; gap:4px; margin-left:6px; }
@@ -1058,15 +1072,60 @@ function canMulligan(){
   return S && !S.over && S.turn===1 && S.mull && S.mull[S.active] && !S.acted[S.active] &&
     (S.active==="plant" ? S.phase==="p" : S.phase==="z1");
 }
-function doMulligan(){
+/* Individual-card mulligan: each player gets ONE pass over their opening hand, on which
+   they pick any number of cards (including none, or all) to send back and redraw fresh —
+   the cards they don't mark are kept exactly as drawn. Replaces the old all-or-nothing
+   "redraw the whole hand" version, which G found unclear was even available (no obvious
+   entry point explaining what it does) and too blunt (redrawing 1 good card meant losing
+   the other keepers too). The overlay makes the option impossible to miss. */
+let mullMarked=null; // Set of hand indices marked for redraw, while the overlay is open
+function openMulliganOverlay(){
   if(uiLock||!canMulligan()) return;
-  const p=P(S.active), n=p.hand.length;
-  p.deck.push(...p.hand.splice(0));
-  shuffle(p.deck);
-  draw(S.active,n);
+  mullMarked=new Set();
+  renderMulliganOverlay();
+  $("overlay").classList.remove("hidden");
+}
+function renderMulliganOverlay(){
+  const hand=P(S.active).hand;
+  const cardsHtml=hand.map((card,i)=>{
+    const marked=mullMarked.has(i);
+    return `<div class="card mullCard${marked?" toRedraw":""}${rarityClass(card)}" data-i="${i}">${cardFaceMarkup(card)}${marked?'<div class="mullMark">🔄 Redraw</div>':""}</div>`;
+  }).join("");
+  const n=mullMarked.size;
+  const confirmLabel = n===0 ? "Keep Whole Hand" : `Redraw ${n} Card${n===1?"":"s"}`;
+  $("overlayCard").className="mullModal";
+  $("overlayCard").classList.toggle("zSide", S.active==="zombie");
+  $("overlayCard").innerHTML=`
+    <h2>Mulligan — one-time redraw</h2>
+    <p>Tap any cards you want to send back and replace with fresh ones from your deck. Leave the rest untapped to keep them. This is a one-time choice for turn 1.</p>
+    <div class="mullGrid">${cardsHtml}</div>
+    <div class="confirmRow"><button id="mullCancelBtn" class="secondary">Cancel</button><button id="mullConfirmBtn">${confirmLabel}</button></div>`;
+  $("overlay").querySelectorAll(".mullCard").forEach(el=>{
+    el.onclick=()=>{
+      const i=+el.dataset.i;
+      if(mullMarked.has(i)) mullMarked.delete(i); else mullMarked.add(i);
+      renderMulliganOverlay();
+    };
+  });
+  $("mullCancelBtn").onclick=()=>{ $("overlay").classList.add("hidden"); mullMarked=null; render(); };
+  $("mullConfirmBtn").onclick=()=>commitMulligan();
+}
+function commitMulligan(){
+  if(!canMulligan()||!mullMarked) return;
+  const p=P(S.active);
+  const n=mullMarked.size;
+  if(n>0){
+    const idxs=[...mullMarked].sort((a,b)=>b-a); // remove highest index first so earlier indices stay valid
+    const redrawn=idxs.map(i=>p.hand.splice(i,1)[0]);
+    p.deck.push(...redrawn);
+    shuffle(p.deck);
+    draw(S.active,n);
+  }
   S.mull[S.active]=false;
-  addLog(`${sideName(S.active)} mulligans (${n} cards)`);
-  hint("New hand drawn — no redos!");
+  addLog(n>0 ? `${sideName(S.active)} mulligans ${n} card${n===1?"":"s"}` : `${sideName(S.active)} keeps their hand`);
+  hint(n>0?"New cards drawn — no redos!":"Hand kept — no redos!");
+  mullMarked=null;
+  $("overlay").classList.add("hidden");
   S.sel=null; render();
 }
 
@@ -2253,7 +2312,7 @@ function showHelp(){
   <p><b>Keywords:</b><br>${Object.values(KWDESC).join("<br>")}<br><i>A minion that dies in the trade does NOT get its Strikethrough or Frenzy hit — survivors only.</i></p>
   <p><b>Factions:</b> The Otherworld is tougher and can heal. The Regime hits harder and has area damage.</p>
   <p><b>Decks:</b> every deck is exactly 40 cards with at most 4 copies of any card. Build your own in the 🃏 Deck Builder on the home screen and pick it when starting a game.</p>
-  <p><b>Mulligan:</b> on turn 1, each player may redraw their whole hand once — before playing anything.</p>
+  <p><b>Mulligan:</b> on turn 1, before playing anything, tap the 🔄 Mulligan button to review your hand and pick individual cards to send back and redraw — keep the ones you like, one-time only.</p>
   <p><b>Tips:</b> tap the small log line to see the full battle history. Hold down on a card in your hand to read its full text if it's cut off. A game in progress is saved automatically — if the page closes, use Resume on the home screen.</p>
   <p><b>Hotseat:</b> pass the phone at each phase-change screen so hands stay secret.</p>
   <p><b>Vs AI:</b> in a solo game the AI plays its phases by itself — watch the board and the log to see its moves.</p></div><button id="closeHelp">Close</button>`;
@@ -2468,7 +2527,7 @@ $("hand").addEventListener("scroll",updateHandFade);
 $("helpBtn").onclick=showHelp;
 $("hintBar").onclick=cancelSel;
 $("logBar").onclick=showLogHistory;
-$("mullBtn").onclick=doMulligan;
+$("mullBtn").onclick=openMulliganOverlay;
 $("zombieBar").onclick=()=>onHeroTap("zombie");
 $("plantBar").onclick=()=>onHeroTap("plant");
 $("playBtn").onclick=startHotseat;
