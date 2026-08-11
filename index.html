@@ -304,6 +304,10 @@
   .card.unplayable::after { content:"🔒"; position:absolute; top:2px; right:3px; font-size:11px; filter:none; text-shadow:0 1px 2px #000; }
   .card.selected { border-color:#ffd75e !important; box-shadow:0 0 10px #ffd75e77; transform:translateY(-6px); }
   .card.validHandTarget { border-color:#7fe06d !important; border-style:solid; box-shadow:0 0 8px #7fe06d66; }
+  /* while a hand-targeting trick (buffHand/transfigure) is selected, energy affordability
+     is irrelevant to whether a card can be targeted — only trick-eligibility matters, so
+     this replaces .unplayable's grayscale/lock treatment for the duration of that selection */
+  .card.invalidHandTarget { border-color:#6b6b6b !important; border-style:solid; opacity:0.6; }
   /* drag-and-drop: the source card dims in place while its floating clone follows the
      pointer/finger; the clone is a straight visual copy so rarity borders etc. still show */
   .card.dragSource { opacity:0.32; }
@@ -1927,15 +1931,22 @@ function renderHand(selCard){
   if(S.phase==="combat"||S.over||S.handoff||isAiTurn()){ updateHandFade(); return; } // AI's hand stays hidden
   const buffHandSel = selCard && selCard.t==="t" && selCard.fx.k==="buffHand";
   const transfigureSel = selCard && selCard.t==="t" && selCard.fx.k==="transfigure";
+  const handTargetSel = buffHandSel || transfigureSel;
   P(S.active).hand.forEach((card,i)=>{
     const el=document.createElement("div");
     el.className="card"+rarityClass(card);
-    if(!canPlayCard(card)) el.classList.add("unplayable");
     if(S.sel===i) el.classList.add("selected");
-    // while a hand-buff trick is selected, spotlight the other minions it can target
-    if(buffHandSel && i!==S.sel && card.t==="m") el.classList.add("validHandTarget");
-    // Transfigure can target any card type in hand except itself
-    if(transfigureSel && i!==S.sel) el.classList.add("validHandTarget");
+    if(handTargetSel){
+      // targeting a hand-affecting trick: whether you can afford to *play* a card doesn't
+      // matter here, only whether the trick can land on it — so don't dim/lock cards for
+      // being unaffordable, just mark them valid (green) or not (grey) as trick targets
+      if(i!==S.sel){
+        const isValidTarget = buffHandSel ? card.t==="m" : true; // Transfigure can hit any card type
+        el.classList.add(isValidTarget ? "validHandTarget" : "invalidHandTarget");
+      }
+    } else if(!canPlayCard(card)){
+      el.classList.add("unplayable");
+    }
     el.innerHTML=cardFaceMarkup(card);
     el.onclick=()=>onCardTap(i);
     el.addEventListener("pointerdown",e=>startCardDrag(e,i,el));
