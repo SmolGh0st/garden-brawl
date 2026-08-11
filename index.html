@@ -1330,7 +1330,7 @@ function castTrick(idx,target){
     anchorEl=cardEls[targetIdx]||null;
   }
   else if(fx.k==="heal" || fx.k==="draw" || fx.k==="scry") anchorEl=$(heroBarId(side)); // affects the caster
-  else if(fx.k==="aoe") anchorEl=$(heroBarId(otherSide(side)));              // hits the enemy side
+  else if(fx.k==="aoe") anchorEl=$(`cell-${otherSide(side)}-2`);            // hits every enemy minion on the board — anchor over the board (middle lane), not the hero bar
   if(anchorEl){
     const r=anchorEl.getBoundingClientRect();
     spawnTrickPreview(card, r.left+r.width/2, r.top+r.height/2);
