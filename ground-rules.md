@@ -31,8 +31,13 @@ happened twice (2026-08-10, twice in one day).
   will always fail with 403. That's expected. The real deploy path is GitHub's
   web "Upload files" page via Claude in Chrome.
 - Multiple Chrome browsers may be connected to this account, and not all of them
-  are signed into GitHub with push access. Always confirm which browser with G
-  (or use switch_browser) rather than assuming the first one in the list.
+  are signed into GitHub with push access. **Default to the confirmed browser:
+  deviceId `90a92421-0fd3-432e-b8e6-46e49ffe6da6` ("Browser 3", Windows) — this
+  is the one signed into GitHub as SmolGh0st.** Use `select_browser` with that
+  deviceId directly; don't re-ask G or re-run `list_connected_browsers`'s
+  confirmation flow every session. Only ask G which browser to use if this one
+  isn't in the connected list, or if a screenshot shows it's not actually signed
+  into SmolGh0st anymore (accounts can change on the user's end).
 - The commit-message textbox on GitHub's upload page occasionally swallows typed
   text silently (field stays empty, commit goes through with a placeholder
   message). Screenshot after typing to confirm the text actually landed, every
