@@ -268,6 +268,10 @@
   /* hand */
   #handWrap { padding:4px 6px 8px; }
   #hand { display:flex; gap:6px; overflow-x:auto; padding:4px 2px 6px; -webkit-overflow-scrolling:touch; }
+  /* let a horizontal swipe on a hand card keep scrolling the strip natively, while a
+     vertical drag (picking the card up toward the board) is left for JS to handle —
+     see the drag-and-drop controller further down */
+  #hand .card { touch-action:pan-x; }
   /* edge fade is applied dynamically via JS (mask-image) when the hand scrolls off-screen */
   .card {
     flex:0 0 74px; height:104px; border-radius:10px; padding:3px 3px 4px;
@@ -300,6 +304,20 @@
   .card.unplayable::after { content:"🔒"; position:absolute; top:2px; right:3px; font-size:11px; filter:none; text-shadow:0 1px 2px #000; }
   .card.selected { border-color:#ffd75e !important; box-shadow:0 0 10px #ffd75e77; transform:translateY(-6px); }
   .card.validHandTarget { border-color:#7fe06d !important; border-style:solid; box-shadow:0 0 8px #7fe06d66; }
+  /* drag-and-drop: the source card dims in place while its floating clone follows the
+     pointer/finger; the clone is a straight visual copy so rarity borders etc. still show */
+  .card.dragSource { opacity:0.32; }
+  .dragClone {
+    position:fixed; z-index:90; pointer-events:none; margin:0 !important;
+    transform:scale(1.08) rotate(-2deg); transition:none !important;
+    box-shadow:0 14px 30px #000c, 0 0 0 2px #ffd75e99;
+  }
+  /* whatever's currently under the dragged card gets a plain ring — green once it's also
+     a legal target (validSpot/validTarget/targetable, from the normal tap-select render),
+     red if it isn't, so a drag makes illegal drops obvious before you even let go */
+  .dragHover { outline:3px solid #fff; outline-offset:-3px; border-radius:8px; }
+  .dragHoverOk { outline-color:#7fe06d; }
+  .dragHoverBad { outline-color:#ff6b6b; }
   .card .cost {
     position:absolute; top:-6px; left:-5px; width:20px; height:20px; z-index:2;
     background:linear-gradient(135deg,#f5dd7a,#c9a437); color:#221c07;
@@ -1076,6 +1094,125 @@ function onHeroTap(side){
   if(card && card.t==="t" && card.fx.k==="dmg" && side===otherSide(S.active)) castTrick(S.sel,{hero:side});
   else cancelSel();
 }
+/* ============ DRAG & DROP (hand → board) ============
+   An alternative input path alongside tap-to-select/tap-to-place — a drag gesture
+   just performs the same two taps as one continuous motion, by literally calling
+   onCardTap/onCellTap/onHeroTap/cancelSel at the right moments. That's deliberate:
+   it means the rules, legality checks, and hint text can never drift between the
+   two input methods, since there's only one implementation of "select" and "place."
+   Built on Pointer Events so the same code drives mouse drag and touch drag.
+   Self-only tricks (draw/heal/aoe/scry) have no board target to drop onto, so
+   they're left tap-only — see DRAG_ELIGIBLE_FX below. */
+const DRAG_ELIGIBLE_FX = new Set(["buff","dmg","destroy","buffHand","transfigure"]);
+function dragEligible(card){
+  if(card.t==="m"||card.t==="e") return true;
+  return card.t==="t" && DRAG_ELIGIBLE_FX.has(card.fx.k);
+}
+let dragCand=null;
+function startCardDrag(e,index,el){
+  if(dragCand||uiLock||S.over||S.phase==="combat"||isAiTurn()) return;
+  const card=P(S.active).hand[index];
+  if(!card||!dragEligible(card)) return;
+  dragCand={index,el,startX:e.clientX,startY:e.clientY,pointerId:e.pointerId,dragging:false,cloneEl:null,hoverEl:null,liveEl:null};
+  // listeners live on `document`, not the card element itself — selecting the card
+  // (below, once the drag threshold is crossed) triggers a render() that rebuilds the
+  // whole hand strip and detaches the original card node, which would silently kill
+  // element-scoped listeners/pointer-capture partway through the gesture
+  document.addEventListener("pointermove",onCardDragMove);
+  document.addEventListener("pointerup",onCardDragEnd);
+  document.addEventListener("pointercancel",onCardDragCancel);
+}
+function onCardDragMove(e){
+  const cand=dragCand;
+  if(!cand||e.pointerId!==cand.pointerId) return;
+  if(!cand.dragging){
+    if(Math.hypot(e.clientX-cand.startX,e.clientY-cand.startY)<10) return; // still ambiguous — could be a tap, or (on the hand strip) a horizontal scroll
+    beginCardDrag(cand);
+    if(!cand.dragging) return; // unplayable card — onCardTap already showed the hint
+  }
+  e.preventDefault();
+  cand.cloneEl.style.left=(e.clientX-cand.offsetX)+"px";
+  cand.cloneEl.style.top=(e.clientY-cand.offsetY)+"px";
+  updateDragHover(cand,e.clientX,e.clientY);
+}
+function beginCardDrag(cand){
+  const rect=cand.el.getBoundingClientRect(); // snapshot now — onCardTap's render() below detaches this node
+  if(S.sel!==cand.index){
+    onCardTap(cand.index);
+    if(S.sel!==cand.index){ endCardDrag(cand,false); return; } // canPlayCard failed — same hint tap-select would've shown
+  }
+  const clone=cand.el.cloneNode(true);
+  clone.onclick=null;
+  clone.className=cand.el.className+" dragClone";
+  clone.style.left=rect.left+"px"; clone.style.top=rect.top+"px";
+  clone.style.width=rect.width+"px"; clone.style.height=rect.height+"px";
+  document.body.appendChild(clone);
+  cand.cloneEl=clone;
+  cand.offsetX=cand.startX-rect.left; cand.offsetY=cand.startY-rect.top;
+  cand.dragging=true;
+  cand.liveEl=$("hand").children[cand.index];
+  if(cand.liveEl) cand.liveEl.classList.add("dragSource");
+}
+/* what's under a given screen point, in drag-target terms — shared by the live hover
+   ring (while dragging) and the actual drop resolution (on release), so they always agree */
+function dragHitTest(x,y){
+  const el=document.elementFromPoint(x,y);
+  if(!el) return null;
+  const cell=el.closest(".cell");
+  if(cell&&cell.id){
+    const parts=cell.id.split("-"); // "cell-<side>-<lane>"
+    if(parts.length===3) return {type:"cell",el:cell,side:parts[1],lane:+parts[2]};
+  }
+  const heroBar=el.closest(".herobar");
+  if(heroBar) return {type:"hero",el:heroBar,side:heroBar.id==="plantBar"?"plant":"zombie"};
+  const handCard=el.closest("#hand .card");
+  if(handCard){
+    const idx=[...$("hand").children].indexOf(handCard);
+    if(idx>=0) return {type:"hand",el:handCard,index:idx};
+  }
+  return null;
+}
+function updateDragHover(cand,x,y){
+  const hit=dragHitTest(x,y);
+  const newEl=(hit&&hit.el!==cand.liveEl)?hit.el:null;
+  if(cand.hoverEl&&cand.hoverEl!==newEl) cand.hoverEl.classList.remove("dragHover","dragHoverOk","dragHoverBad");
+  if(newEl&&cand.hoverEl!==newEl){
+    const ok=newEl.classList.contains("validSpot")||newEl.classList.contains("validTarget")||newEl.classList.contains("targetable");
+    newEl.classList.add("dragHover",ok?"dragHoverOk":"dragHoverBad");
+  }
+  cand.hoverEl=newEl;
+}
+function onCardDragEnd(e){
+  const cand=dragCand;
+  if(!cand||e.pointerId!==cand.pointerId) return;
+  endCardDrag(cand,true,e.clientX,e.clientY);
+}
+function onCardDragCancel(e){
+  const cand=dragCand;
+  if(!cand||e.pointerId!==cand.pointerId) return;
+  endCardDrag(cand,false);
+}
+function endCardDrag(cand,resolveTarget,x,y){
+  document.removeEventListener("pointermove",onCardDragMove);
+  document.removeEventListener("pointerup",onCardDragEnd);
+  document.removeEventListener("pointercancel",onCardDragCancel);
+  if(cand.dragging){
+    if(cand.hoverEl) cand.hoverEl.classList.remove("dragHover","dragHoverOk","dragHoverBad");
+    if(cand.cloneEl) cand.cloneEl.remove();
+    if(resolveTarget) resolveDrop(cand,x,y); else cancelSel();
+  }
+  dragCand=null;
+}
+function resolveDrop(cand,x,y){
+  const hit=dragHitTest(x,y);
+  const hand=P(S.active).hand, draggedCard=hand[cand.index];
+  if(hit&&hit.type==="cell"){ onCellTap(hit.lane,hit.side); return; }
+  if(hit&&hit.type==="hero"){ onHeroTap(hit.side); return; }
+  if(hit&&hit.type==="hand"&&hit.index!==cand.index&&draggedCard&&draggedCard.t==="t"&&(draggedCard.fx.k==="buffHand"||draggedCard.fx.k==="transfigure")){
+    onCardTap(hit.index); return;
+  }
+  cancelSel();
+}
 function playMinion(idx,lane){
   const card=P(S.active).hand[idx];
   if(S.acted) S.acted[S.active]=true;
@@ -1717,16 +1854,16 @@ function render(){
 
   if(isAiTurn()&&S.phase!=="combat"){ hint(`🤖 ${sideName(S.aiSide)} is thinking…`); saveGame(); return; }
   if(selCard){
-    if(selCard.t==="m") hint("Tap a glowing lane to place it · tap elsewhere to cancel");
-    else if(selCard.t==="e") hint("Tap any lane to place it — replaces that lane's environment · tap elsewhere to cancel");
-    else if(selCard.fx.k==="dmg") hint("Tap an enemy minion or the enemy hero · tap elsewhere to cancel");
-    else if(selCard.fx.k==="buff") hint("Tap one of your minions · tap elsewhere to cancel");
-    else if(selCard.fx.k==="destroy") hint("Tap an enemy minion · tap elsewhere to cancel");
-    else if(selCard.fx.k==="buffHand") hint("Tap a minion in your hand to buff it · tap elsewhere to cancel");
-    else if(selCard.fx.k==="transfigure") hint("Tap a card in your hand to transform it · tap elsewhere to cancel");
+    if(selCard.t==="m") hint("Tap or drag onto a glowing lane to place it · tap elsewhere to cancel");
+    else if(selCard.t==="e") hint("Tap or drag onto any lane to place it — replaces that lane's environment · tap elsewhere to cancel");
+    else if(selCard.fx.k==="dmg") hint("Tap or drag onto an enemy minion or the enemy hero · tap elsewhere to cancel");
+    else if(selCard.fx.k==="buff") hint("Tap or drag onto one of your minions · tap elsewhere to cancel");
+    else if(selCard.fx.k==="destroy") hint("Tap or drag onto an enemy minion · tap elsewhere to cancel");
+    else if(selCard.fx.k==="buffHand") hint("Tap or drag onto a minion in your hand to buff it · tap elsewhere to cancel");
+    else if(selCard.fx.k==="transfigure") hint("Tap or drag onto a card in your hand to transform it · tap elsewhere to cancel");
     else hint("Tap the card again to cast");
   } else if(S.phase==="combat") hint("Lanes fight left to right — minions trade simultaneously");
-  else hint("Tap a card to play it, or end the phase");
+  else hint("Tap or drag a card to play it, or end the phase");
   saveGame();
 }
 /* which lane-floor tint class an environment's effect maps to — one per card, since
@@ -1746,7 +1883,7 @@ function renderRow(elId,side,selCard){
     if(m){
       cell.classList.add("hasMinion");
       const art=artFor(m.n);
-      const face = art ? `<img class="mArt" src="${art}" alt="${m.n}">` : `<div class="mEmoji">${m.e}</div>`;
+      const face = art ? `<img class="mArt" src="${art}" alt="${m.n}" draggable="false">` : `<div class="mEmoji">${m.e}</div>`;
       cell.innerHTML=`<div class="kwDot">${kwSymbols(m)}</div>${face}<div class="mName">${m.n}</div><div class="mStats"><span class="a">⚔${m.a}</span><span class="h">❤${m.hp}</span></div>`;
       if(selCard&&selCard.t==="t"){
         const fx=selCard.fx;
@@ -1779,7 +1916,7 @@ function cardFaceMarkup(card){
     ? [card.kw.map(k=>KWNAME[k]).join(" "),card.d].filter(Boolean).join(" · ")
     : card.d;
   const art=artFor(card.n);
-  const artHtml = art ? `<img src="${art}" alt="${card.n}">` : `<span class="cEmoji">${card.e}</span>`;
+  const artHtml = art ? `<img src="${art}" alt="${card.n}" draggable="false">` : `<span class="cEmoji">${card.e}</span>`;
   const typeTag = card.t==="m"
     ? `<div class="cStats"><span class="a">⚔${card.a}</span><span class="h">❤${card.h}</span></div>`
     : card.t==="e" ? `<div class="trickTag envTag">🌍 ENVIRONMENT</div>` : `<div class="trickTag">✨ TRICK</div>`;
@@ -1801,6 +1938,7 @@ function renderHand(selCard){
     if(transfigureSel && i!==S.sel) el.classList.add("validHandTarget");
     el.innerHTML=cardFaceMarkup(card);
     el.onclick=()=>onCardTap(i);
+    el.addEventListener("pointerdown",e=>startCardDrag(e,i,el));
     handEl.appendChild(el);
   });
   updateHandFade();
