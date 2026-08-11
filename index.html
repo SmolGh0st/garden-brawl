@@ -497,6 +497,11 @@
      silently swallow a plain border-color override. */
   .card.coreCard { box-shadow:0 0 0 2px #d4d4d4, 0 2px 6px #0007, inset 0 1px 0 #ffffff14; }
   .card.coreCard .cost { box-shadow:0 1px 3px #000c, inset 0 1px 0 #ffffff88, 0 0 0 1px #d4d4d4; }
+  /* Compendium only (deck building isn't ownership-gated — every card in the pool can be
+     added to a deck regardless) — grey out cards you don't own yet, same visual language
+     as .unplayable's grayscale+lock treatment used for hand cards elsewhere */
+  .card.unowned { opacity:0.55; filter:grayscale(0.7) brightness(0.75); }
+  .card.unowned::after { content:"🔒"; position:absolute; top:2px; right:3px; font-size:11px; filter:none; text-shadow:0 1px 2px #000; }
   .haveBadge {
     position:absolute; bottom:-5px; right:-4px; z-index:2;
     background:#ffd75e; color:#221c07; font-size:10px; font-weight:800;
@@ -2041,8 +2046,8 @@ function renderHand(selCard){
 let compendiumBuilt=false;
 function renderCompendium(){
   if(compendiumBuilt) return;
-  $("compPlantGrid").innerHTML = PLANT_POOL.map(c=>`<div class="card${rarityClass(c)}${isCoreCard(c.n)?' coreCard':''}" data-name="${c.n}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}${coreBadgeHtml(c.n)}</div>`).join("");
-  $("compZombieGrid").innerHTML = ZOMBIE_POOL.map(c=>`<div class="card zSide${rarityClass(c)}${isCoreCard(c.n)?' coreCard':''}" data-name="${c.n}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}${coreBadgeHtml(c.n)}</div>`).join("");
+  $("compPlantGrid").innerHTML = PLANT_POOL.map(c=>`<div class="card${rarityClass(c)}${isCoreCard(c.n)?' coreCard':' unowned'}" data-name="${c.n}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':'Not owned yet'}">${cardFaceMarkup(c)}${coreBadgeHtml(c.n)}</div>`).join("");
+  $("compZombieGrid").innerHTML = ZOMBIE_POOL.map(c=>`<div class="card zSide${rarityClass(c)}${isCoreCard(c.n)?' coreCard':' unowned'}" data-name="${c.n}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':'Not owned yet'}">${cardFaceMarkup(c)}${coreBadgeHtml(c.n)}</div>`).join("");
   compendiumBuilt=true;
 }
 /* zoomed-in card view: bigger art, full stats, and a flavor quote if one exists */
