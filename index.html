@@ -238,8 +238,40 @@
     100% { transform:translate(-50%,-64%) scale(0.6); opacity:0; }
   }
 
+  /* used when a trick targets one specific minion or hero (see spawnTargetedTrickPreview) —
+     the preview card sits BELOW the target with an arrow pointing back up at it, and a ring
+     is drawn around the target itself, instead of the plain floating card used for self-cast
+     tricks/hand-card targets, where there's no one thing to point an arrow at. */
+  .trickPreview .tpArrow {
+    width:0; height:0;
+    border-left:7px solid transparent; border-right:7px solid transparent;
+    border-bottom:9px solid #c9a2ff;
+    filter:drop-shadow(0 -1px 2px #0008);
+  }
+  .trickPreview.trickPreview--below { animation: tpPopBelow 2600ms cubic-bezier(0.16,1,0.3,1) forwards; }
+  @keyframes tpPopBelow {
+    0%   { transform:translate(-50%,-8px) scale(0.5); opacity:0; }
+    6%   { transform:translate(-50%,4px) scale(1.05); opacity:1; }
+    10%  { transform:translate(-50%,0) scale(1); opacity:1; }
+    92%  { transform:translate(-50%,0) scale(1); opacity:1; }
+    100% { transform:translate(-50%,-10px) scale(0.6); opacity:0; }
+  }
+  .trickTargetRing {
+    position:fixed; z-index:64; pointer-events:none;
+    border:2px solid #ffd75e; border-radius:50%;
+    box-shadow:0 0 8px #ffd75e77;
+    animation: trickRingPop 2600ms cubic-bezier(0.16,1,0.3,1) forwards;
+  }
+  @keyframes trickRingPop {
+    0%   { transform:translate(-50%,-50%) scale(0.6); opacity:0; }
+    8%   { transform:translate(-50%,-50%) scale(1.1); opacity:1; }
+    14%  { transform:translate(-50%,-50%) scale(1); opacity:0.9; }
+    90%  { transform:translate(-50%,-50%) scale(1); opacity:0.9; }
+    100% { transform:translate(-50%,-50%) scale(0.85); opacity:0; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .impactFx, .pierceBeam, .frenzyArc, .cell.dying, .trickPreview, .fxTag, .card.cardPulse { animation-duration:1ms !important; }
+    .impactFx, .pierceBeam, .frenzyArc, .cell.dying, .trickPreview, .fxTag, .card.cardPulse, .trickTargetRing { animation-duration:1ms !important; }
   }
 
   .cell .mEmoji { font-size:26px; line-height:1.1; }
@@ -1087,7 +1119,7 @@ function onCardTap(i){
     return;
   }
   if(S.sel===i){
-    if(card.t==="t"&&["draw","heal","aoe","scry"].includes(card.fx.k)){ castTrick(i,null); return; }
+    if(card.t==="t"&&SELF_CAST_FX.has(card.fx.k)){ castTrick(i,null); return; }
     S.sel=null; render(); return;
   }
   S.sel=i; render();
@@ -1132,12 +1164,15 @@ function onHeroTap(side){
    it means the rules, legality checks, and hint text can never drift between the
    two input methods, since there's only one implementation of "select" and "place."
    Built on Pointer Events so the same code drives mouse drag and touch drag.
-   Self-only tricks (draw/heal/aoe/scry) have no board target to drop onto, so
-   they're left tap-only — see DRAG_ELIGIBLE_FX below. */
+   Self-only tricks (draw/heal/aoe/scry) have no board target to drop onto — but they're
+   still draggable: since there's nothing specific to aim at, any drop (anywhere at all)
+   just confirms the cast, the same way tapping the card a second time would. See
+   SELF_CAST_FX and its handling in resolveDrop/updateDragHover below. */
 const DRAG_ELIGIBLE_FX = new Set(["buff","dmg","destroy","buffHand","transfigure"]);
+const SELF_CAST_FX = new Set(["draw","heal","aoe","scry"]);
 function dragEligible(card){
   if(card.t==="m"||card.t==="e") return true;
-  return card.t==="t" && DRAG_ELIGIBLE_FX.has(card.fx.k);
+  return card.t==="t" && (DRAG_ELIGIBLE_FX.has(card.fx.k) || SELF_CAST_FX.has(card.fx.k));
 }
 const LONG_PRESS_MS = 450; // holding a hand card this long (without dragging) opens its full-text zoom view
 let dragCand=null;
@@ -1238,7 +1273,11 @@ function updateDragHover(cand,x,y){
   const newHoverEls=newEl ? (pairEl ? [newEl,pairEl] : [newEl]) : [];
   (cand.hoverEls||[]).forEach(el=>{ if(!newHoverEls.includes(el)) el.classList.remove("dragHover","dragHoverOk","dragHoverBad"); });
   if(newHoverEls.length){
-    const ok=newEl.classList.contains("validSpot")||newEl.classList.contains("validTarget")||newEl.classList.contains("targetable");
+    // self-cast tricks (draw/heal/aoe/scry) have no specific target — wherever they're
+    // hovering is always a valid drop, so always show the "ok" ring rather than checking
+    // for a validSpot/validTarget/targetable class that these cards never actually set
+    const isSelfCast=draggedCard&&draggedCard.t==="t"&&SELF_CAST_FX.has(draggedCard.fx.k);
+    const ok=isSelfCast||newEl.classList.contains("validSpot")||newEl.classList.contains("validTarget")||newEl.classList.contains("targetable");
     newHoverEls.forEach(el=>el.classList.add("dragHover",ok?"dragHoverOk":"dragHoverBad"));
   }
   cand.hoverEls=newHoverEls;
@@ -1266,8 +1305,11 @@ function endCardDrag(cand,resolveTarget,x,y){
   dragCand=null;
 }
 function resolveDrop(cand,x,y){
-  const hit=dragHitTest(x,y);
   const hand=P(S.active).hand, draggedCard=hand[cand.index];
+  // self-cast tricks (draw/heal/aoe/scry) have no board target — any drop, wherever it
+  // lands (even nowhere recognized at all), just confirms the cast
+  if(draggedCard&&draggedCard.t==="t"&&SELF_CAST_FX.has(draggedCard.fx.k)){ castTrick(cand.index,null); return; }
+  const hit=dragHitTest(x,y);
   if(hit&&hit.type==="cell"){ onCellTap(hit.lane,hit.side); return; }
   if(hit&&hit.type==="hero"){ onHeroTap(hit.side); return; }
   if(hit&&hit.type==="hand"&&hit.index!==cand.index&&draggedCard&&draggedCard.t==="t"&&(draggedCard.fx.k==="buffHand"||draggedCard.fx.k==="transfigure")){
@@ -1319,8 +1361,12 @@ function castTrick(idx,target){
   // show a brief floating preview of the trick's art/name over wherever it landed —
   // captured before anything moves or gets removed from the board
   let anchorEl=null;
-  if(target && target.hero) anchorEl=$(heroBarId(target.hero));
-  else if(target && target.lane!==undefined) anchorEl=$(`cell-${target.side}-${target.lane}`);
+  // true when a trick targets one specific minion or hero — those get the ring-around-the-
+  // target + arrow-pointing-up-from-below preview (spawnTargetedTrickPreview) instead of the
+  // plain floating card, since there's an actual "them" to point at
+  let targetedEntity=false;
+  if(target && target.hero){ anchorEl=$(heroBarId(target.hero)); targetedEntity=true; }
+  else if(target && target.lane!==undefined){ anchorEl=$(`cell-${target.side}-${target.lane}`); targetedEntity=true; }
   else if(target && target.handCardRef){
     // buffHand/Transfigure target a specific card already in hand — anchor the preview to
     // that card's current on-screen position, same as it hovers in front of a targeted
@@ -1332,8 +1378,14 @@ function castTrick(idx,target){
   else if(fx.k==="heal" || fx.k==="draw" || fx.k==="scry") anchorEl=$(heroBarId(side)); // affects the caster
   else if(fx.k==="aoe") anchorEl=$(`cell-${otherSide(side)}-2`);            // hits every enemy minion on the board — anchor over the board (middle lane), not the hero bar
   if(anchorEl){
-    const r=anchorEl.getBoundingClientRect();
-    spawnTrickPreview(card, r.left+r.width/2, r.top+r.height/2);
+    if(targetedEntity){
+      // for a hero, ring just the portrait (.face) rather than the whole width of the
+      // health bar — a circle stretched across the full bar wouldn't read as "around them"
+      spawnTargetedTrickPreview(card, anchorEl.querySelector(".face")||anchorEl);
+    } else {
+      const r=anchorEl.getBoundingClientRect();
+      spawnTrickPreview(card, r.left+r.width/2, r.top+r.height/2);
+    }
   }
 
   P(side).res-=card.c;
@@ -1890,6 +1942,38 @@ function spawnTrickPreview(card,x,y){
   const clampedX=Math.min(Math.max(x,halfW+pad),window.innerWidth-halfW-pad);
   if(clampedX!==x) el.style.left=clampedX+"px";
   setTimeout(()=>el.remove(),TRICK_PREVIEW_MS); // keep in sync with the .trickPreview animation-duration above
+}
+/* used instead of spawnTrickPreview when a trick targets one specific minion or hero — draws
+   a ring around the actual target and pops the preview card below it with an arrow pointing
+   back up, so it's unambiguous which one it is, for as long as the preview stays up */
+function spawnTargetedTrickPreview(card,targetEl){
+  const r=targetEl.getBoundingClientRect();
+  const cx=r.left+r.width/2, cy=r.top+r.height/2;
+  const ringSize=Math.max(r.width,r.height)+16;
+  const ring=document.createElement("div");
+  ring.className="trickTargetRing";
+  ring.style.left=cx+"px"; ring.style.top=cy+"px";
+  ring.style.width=ringSize+"px"; ring.style.height=ringSize+"px";
+  document.body.appendChild(ring);
+  setTimeout(()=>ring.remove(),TRICK_PREVIEW_MS);
+
+  const art=artFor(card.n);
+  const artHtml = art ? `<img src="${art}" alt="${card.n}">` : `<span class="tpEmoji">${card.e}</span>`;
+  const descHtml = card.d ? `<div class="tpDesc">${card.d}</div>` : "";
+  const el=document.createElement("div");
+  el.className="trickPreview trickPreview--below";
+  el.innerHTML=`<div class="tpArrow"></div><div class="tpArt">${artHtml}</div><div class="tpName">${card.n}</div>${descHtml}`;
+  const py=r.bottom+10;
+  el.style.left=cx+"px"; el.style.top=py+"px";
+  document.body.appendChild(el);
+  // same off-screen nudging as spawnTrickPreview, plus a vertical one: a target near the
+  // bottom of the screen (e.g. the player's own hero bar) could push the card off the bottom
+  const halfW=el.offsetWidth/2, pad=8;
+  const clampedX=Math.min(Math.max(cx,halfW+pad),window.innerWidth-halfW-pad);
+  if(clampedX!==cx) el.style.left=clampedX+"px";
+  const maxTop=window.innerHeight-pad-el.offsetHeight;
+  if(py>maxTop) el.style.top=maxTop+"px";
+  setTimeout(()=>el.remove(),TRICK_PREVIEW_MS);
 }
 /* the losing minion shatters in place; caller awaits before removing it from state so the exit is seen, not skipped */
 function playDeath(cellEl,variant){
