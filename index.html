@@ -166,13 +166,11 @@
     100% { transform:translate(var(--dx),var(--dy)) scale(0.85) rotate(20deg); opacity:0; }
   }
 
-  /* trick cast preview: pops up over the target, holds for a couple seconds so its
-     effect text is actually readable, then blips out. Duration lives in one place —
-     the JS setTimeout() removal below — keep the keyframe percentages in sync with it. */
+  /* trick cast preview: pops up over the target, holds a moment, fades out */
   .trickPreview {
     position:fixed; z-index:65; pointer-events:none;
     display:flex; flex-direction:column; align-items:center; gap:4px;
-    animation: tpPop 2600ms cubic-bezier(0.16,1,0.3,1) forwards;
+    animation: tpPop 950ms cubic-bezier(0.16,1,0.3,1) forwards;
   }
   .trickPreview .tpArt {
     width:64px; height:64px; border-radius:12px; overflow:hidden;
@@ -186,17 +184,12 @@
     font-size:11px; font-weight:700; color:#fff; text-shadow:0 1px 3px #000;
     background:#00000090; padding:2px 8px; border-radius:8px; white-space:nowrap;
   }
-  .trickPreview .tpDesc {
-    font-size:10px; font-weight:600; color:#e8e6d8; text-align:center; line-height:1.3;
-    background:#000000a8; border:1px solid #ffffff22; padding:4px 8px; border-radius:8px;
-    max-width:150px;
-  }
   @keyframes tpPop {
     0%   { transform:translate(-50%,-50%) scale(0.5); opacity:0; }
-    6%   { transform:translate(-50%,-64%) scale(1.05); opacity:1; }
-    10%  { transform:translate(-50%,-64%) scale(1); opacity:1; }
-    92%  { transform:translate(-50%,-64%) scale(1); opacity:1; }
-    100% { transform:translate(-50%,-64%) scale(0.6); opacity:0; }
+    15%  { transform:translate(-50%,-64%) scale(1.05); opacity:1; }
+    25%  { transform:translate(-50%,-64%) scale(1); opacity:1; }
+    78%  { transform:translate(-50%,-64%) scale(1); opacity:1; }
+    100% { transform:translate(-50%,-78%) scale(0.85); opacity:0; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -238,15 +231,6 @@
     display:flex; flex-direction:column; align-items:center; position:relative;
   }
   body[data-active="zombie"] .card { background:linear-gradient(180deg,#3a2f47,#201827); border-color:#c9a2ff42; }
-  /* rarity border accents (common = the plain faction-tinted look above, unchanged).
-     !important on border-color because plainer, higher-specificity context rules
-     (compendium/deck-builder ID-scoped faction tints below) would otherwise win —
-     rarity should read the same color everywhere a card shows up. The interaction
-     states just below (unplayable/selected/validHandTarget) get their own
-     !important so they still visibly take over on top of a rare+ card in hand. */
-  .card.rarity-rare { border-color:#4aa8ff !important; box-shadow:0 2px 6px #0007, inset 0 1px 0 #ffffff14, 0 0 6px #4aa8ff66; }
-  .card.rarity-epic { border-color:#c964f0 !important; box-shadow:0 2px 6px #0007, inset 0 1px 0 #ffffff14, 0 0 6px #c964f066; }
-  .card.rarity-legendary { border-color:#ff9645 !important; border-width:2px; box-shadow:0 2px 6px #0007, inset 0 1px 0 #ffffff14, 0 0 8px #ff964588; }
   /* art window: shows a mapped custom image if one exists, otherwise the card's emoji */
   .card .cArt {
     width:calc(100% - 6px); height:38px; margin-top:6px; border-radius:6px; flex:0 0 auto;
@@ -259,8 +243,8 @@
   .cell img.mArt { width:34px; height:34px; border-radius:50%; object-fit:cover; border:1px solid #ffffff2e; }
   .card.unplayable { opacity:0.62; filter:grayscale(0.65) brightness(0.8); }
   .card.unplayable::after { content:"🔒"; position:absolute; top:2px; right:3px; font-size:11px; filter:none; text-shadow:0 1px 2px #000; }
-  .card.selected { border-color:#ffd75e !important; box-shadow:0 0 10px #ffd75e77; transform:translateY(-6px); }
-  .card.validHandTarget { border-color:#7fe06d !important; border-style:solid; box-shadow:0 0 8px #7fe06d66; }
+  .card.selected { border-color:#ffd75e; box-shadow:0 0 10px #ffd75e77; transform:translateY(-6px); }
+  .card.validHandTarget { border-color:#7fe06d; border-style:solid; box-shadow:0 0 8px #7fe06d66; }
   .card .cost {
     position:absolute; top:-6px; left:-5px; width:20px; height:20px; z-index:2;
     background:linear-gradient(135deg,#f5dd7a,#c9a437); color:#221c07;
@@ -311,7 +295,7 @@
   #compendiumScreen .screenBody, #deckScreen .screenBody { flex:1; min-height:0; overflow-y:auto; padding:12px 12px 24px; -webkit-overflow-scrolling:touch; }
   .compSectionTitle { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:#9ecf7f; margin:0 0 8px; }
   .compSectionTitle.zombieSection { color:#c9a2ff; margin-top:18px; }
-  .compGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:14px; }
+  .compGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:8px 14px; }
   #compendiumScreen .card { flex:none; height:auto; min-height:118px; }
   #compendiumScreen .card .cDesc { overflow:visible; }
   /* the compendium is reachable before any turn sets body[data-active], so its cards
@@ -359,17 +343,6 @@
   #overlayCard h2 { font-size:19px; margin:8px 0 4px; }
   #overlayCard p { font-size:13px; color:#b8c4a8; line-height:1.45; margin:6px 0; }
   #overlayCard button { margin-top:14px; width:100%; padding:13px; border-radius:10px; border:none; font-size:15px; font-weight:700; background:linear-gradient(180deg,#5a8f4d,#3f6b35); color:#fff; }
-  /* the zoomed-card modal (Compendium tap / board tap) recolors purple for a Regime card,
-     instead of always defaulting to the Otherworld's green — matches the purple accent
-     already used everywhere else a Regime card/side shows up (hand cards, buttons, etc.) */
-  #overlayCard.zSide { background:#241c30; border-color:#c9a2ff42; }
-  #overlayCard.zSide button:not(.secondary):not(.danger) { background:linear-gradient(180deg,#7a5aa0,#5a3f7a); }
-  /* carry the card's rarity border into the zoomed-in view too, same colors as the
-     .card.rarity-X rules — !important for the same reason: it must win over the
-     plain/zSide background rule above regardless of selector order */
-  #overlayCard.rarity-rare { border-color:#4aa8ff !important; box-shadow:0 0 16px #4aa8ff44; }
-  #overlayCard.rarity-epic { border-color:#c964f0 !important; box-shadow:0 0 16px #c964f044; }
-  #overlayCard.rarity-legendary { border-width:2px; border-color:#ff9645 !important; box-shadow:0 0 20px #ff964566; }
   #overlayCard .help { text-align:left; font-size:11.5px; }
   #overlayCard .confirmRow { display:flex; gap:8px; margin-top:14px; }
   #overlayCard .confirmRow button { flex:1; margin-top:0; }
@@ -380,6 +353,13 @@
   .deckRules { font-size:11px; color:#9aa88f; margin:0 0 12px; }
   .coreLegend { display:inline-flex; align-items:center; gap:4px; margin-left:6px; }
   .coreSwatch { width:12px; height:12px; border-radius:4px; background:#2f3d2a; box-shadow:0 0 0 2px #d4d4d4; display:inline-block; }
+  /* dev-only testing toggle — deliberately styled to look like a tool, not a normal
+     game control: dashed border, monospace-ish, muted until switched on */
+  .devBtn {
+    display:block; margin:0 0 14px; font-size:11px; padding:6px 10px;
+    background:#ffffff08; border:1px dashed #ffffff33; color:#9aa88f;
+  }
+  .devBtn.devOn { background:#7fe06d22; border-color:#7fe06d88; color:#c9f5be; }
   .deckRow {
     display:flex; align-items:center; gap:10px; padding:11px 12px; margin-bottom:8px;
     background:#ffffff0a; border:1px solid #ffffff1c; border-radius:12px; cursor:pointer;
@@ -509,6 +489,7 @@
   </div>
   <div class="screenBody">
     <p class="deckRules"><span class="coreLegend"><span class="coreSwatch"></span>Core Set — the ×4 badge shows what you own</span></p>
+    <button class="btn small devBtn" id="devUnlockBtn" title="Testing only — marks every card as owned, everywhere it's shown">🔒 Dev: Unlock All (OFF)</button>
     <h3 class="compSectionTitle plantSection">⚔️ Otherworld</h3>
     <div class="compGrid" id="compPlantGrid"></div>
     <h3 class="compSectionTitle zombieSection">🎖️ Regime</h3>
@@ -610,9 +591,7 @@ const CARD_FLAVOR = {
   "Blitzkrieg": "Speed is a weapon before it's a strategy.",
   "Requisition": "Everything belongs to the state, eventually.",
   "Purge": "Simplest way to solve a disagreement.",
-  "Show Trial": "The verdict was decided before the trial began.",
-  "Transfigure": "One shape is as good as another, if you squint.",
-  "Reassignment": "The state finds new uses for everything."
+  "Show Trial": "The verdict was decided before the trial began."
 };
 function flavorFor(card){ return CARD_FLAVOR[card.n] || ""; }
 
@@ -666,8 +645,7 @@ const PLANT_POOL = [
   E("Blooming Grove","🌿",2,{k:"envAllHp",n:2},"When combat reaches this lane: give the minion(s) here +2 HP, on either side","common"),
   E("Chilling Mist","❄️",3,{k:"envEnemyAtk",n:-1},"When combat reaches this lane: give the Regime minion here -1 Attack","common"),
   T("Honed Blade","🔪✨",1,{k:"buffHand",stat:"a",n:1},"Give a minion in your hand +1 Attack","rare"),
-  T("Traveler's Ward","🧭",1,{k:"buffHand",stat:"hp",n:1},"Give a minion in your hand +1 HP","rare"),
-  T("Transfigure","🔄",2,{k:"transfigure"},"Turn a card in your hand into a random Otherworld card","common")
+  T("Traveler's Ward","🧭",1,{k:"buffHand",stat:"hp",n:1},"Give a minion in your hand +1 HP","rare")
 ];
 /* the "Regime" faction — history / government-systems theme */
 const ZOMBIE_POOL = [
@@ -690,8 +668,7 @@ const ZOMBIE_POOL = [
   E("Scorched Earth","🔥",2,{k:"envAllAtk",n:2},"When combat reaches this lane: give the minion(s) here +2 Attack, on either side","common"),
   E("Toxic Fallout","☣️",3,{k:"envEnemyHp",n:-1},"When combat reaches this lane: give the Otherworld minion here -1 HP","common"),
   T("Combat Drills","🎯",1,{k:"buffHand",stat:"a",n:1},"Give a minion in your hand +1 Attack","rare"),
-  T("Field Rations","🍞",1,{k:"buffHand",stat:"hp",n:1},"Give a minion in your hand +1 HP","rare"),
-  T("Reassignment","🔄",2,{k:"transfigure"},"Turn a card in your hand into a random Regime card","common")
+  T("Field Rations","🍞",1,{k:"buffHand",stat:"hp",n:1},"Give a minion in your hand +1 HP","rare")
 ];
 /* lookup by name for the Compendium's zoomed-in card view */
 const ALL_CARDS = {};
@@ -713,7 +690,27 @@ const CORE_SET = new Set([
   "Saboteur","Shock Trooper","Riot Police","Cavalry Charge","Iron Curtain",
   "Communist Manifesto","Blitzkrieg","Requisition","Purge","Show Trial"
 ]);
-function isCoreCard(name){ return CORE_SET.has(name); }
+/* DEV UNLOCK — a testing-only toggle (Compendium button), not a real progression
+   system. While on, every card in the game (Environments, the Rare hand-buff
+   tricks, anything added later) reads as "owned" the same way Core Set cards do,
+   so ownership never gets in the way of testing new content. Persisted across
+   reloads via localStorage so it doesn't need re-toggling every session; entirely
+   separate from CORE_SET itself, which stays untouched as the real baseline. */
+let DEV_UNLOCK_ALL = localStorage.getItem('gbDevUnlockAll') === '1';
+function toggleDevUnlock(){
+  DEV_UNLOCK_ALL = !DEV_UNLOCK_ALL;
+  localStorage.setItem('gbDevUnlockAll', DEV_UNLOCK_ALL ? '1' : '0');
+  compendiumBuilt = false; // force the compendium grids to rebuild with the new badge state
+  renderCompendium();
+  updateDevUnlockBtn();
+  if(deckEd && !$("deckScreen").classList.contains("hidden")) renderDeckEditor();
+}
+function updateDevUnlockBtn(){
+  const btn = $("devUnlockBtn"); if(!btn) return;
+  btn.textContent = DEV_UNLOCK_ALL ? "🔓 Dev: Unlock All (ON)" : "🔒 Dev: Unlock All (OFF)";
+  btn.classList.toggle("devOn", DEV_UNLOCK_ALL);
+}
+function isCoreCard(name){ return DEV_UNLOCK_ALL || CORE_SET.has(name); }
 const MAX_COPIES_OWNED = 4;
 /* how many of a card we own — everything in the Core Set is owned at the deck-build
    cap (4); future non-core cards default to 0 until an unlock system exists. Used
@@ -723,10 +720,6 @@ function ownedCopies(name){ return isCoreCard(name) ? MAX_COPIES_OWNED : 0; }
    (top-left, mana cost) was easy to mistake for a copies-owned count since nothing
    else showed that number on the card face. This sits opposite it, top-right. */
 function coreBadgeHtml(name){ return isCoreCard(name) ? `<div class="ownBadge">×${MAX_COPIES_OWNED}</div>` : ""; }
-/* rarity border — common cards (the vast majority, including unset/undefined `r`)
-   get no extra class and keep the plain faction-tinted card look; rare/epic/legendary
-   get a colored border via the matching .rarity-X CSS rule, wherever the card renders */
-function rarityClass(card){ return (card.r && card.r!=="common") ? ` rarity-${card.r}` : ""; }
 
 /* ============ DECKS ============ */
 /* PvZ-Heroes-style deckbuilding: every deck is exactly 40 cards, max 4 copies of
@@ -917,7 +910,6 @@ function canPlayCard(card){
   if(fx.k==="aoe") return S.lanes.some(l=>l[otherSide(S.active)]);
   if(fx.k==="heal") return P(S.active).hp<20;
   if(fx.k==="buffHand") return P(S.active).hand.some(c=>c!==card && c.t==="m");
-  if(fx.k==="transfigure") return P(S.active).hand.some(c=>c!==card);
   return true; // dmg (hero always targetable), draw
 }
 function onCardTap(i){
@@ -932,10 +924,6 @@ function onCardTap(i){
     if(selCard && selCard.t==="t" && selCard.fx.k==="buffHand"){
       if(card.t==="m") castTrick(S.sel,{handCardRef:card});
       else cancelSel();
-      return;
-    }
-    if(selCard && selCard.t==="t" && selCard.fx.k==="transfigure"){
-      castTrick(S.sel,{handCardRef:card}); // any card type in hand is a valid target
       return;
     }
   }
@@ -1074,24 +1062,6 @@ function castTrick(idx,target){
       addLog(`${card.e}${card.n} gives ${t.e}${t.n} in hand +${fx.n} ${fx.stat==="a"?"Attack":"HP"}`);
     }
   }
-  else if(fx.k==="transfigure"){
-    // same object-identity trick as buffHand (see note above) — find the targeted card,
-    // then swap it in place for a fresh random pick from the caster's own faction pool
-    // (any card type: minion, trick, or environment), excluding itself so it always changes
-    const t=P(side).hand.find(c=>c===target.handCardRef);
-    if(t){
-      const pool=side==="plant"?PLANT_POOL:ZOMBIE_POOL;
-      const candidates=pool.filter(c=>c.n!==t.n);
-      const pick=candidates[Math.floor(Math.random()*candidates.length)];
-      if(pick){
-        const idx=P(side).hand.indexOf(t);
-        const newCard={...pick};
-        if(idx>-1) P(side).hand[idx]=newCard;
-        addLog(`${card.e}${card.n} turns ${t.e}${t.n} into ${newCard.e}${newCard.n}!`);
-        floaterAtEl($(heroBarId(side)),"🔄","#c9a2ff");
-      }
-    }
-  }
   render();
 }
 
@@ -1137,7 +1107,7 @@ function showScryPicker(side,revealed){
   oc.style.maxWidth="440px"; // wider than the default 340px so revealed cards fit in a row
   oc.innerHTML =
     `<h2>🔮 Scry ${revealed.length}</h2><p class="scryHint">Pick one to keep — the rest shuffle back into the deck.</p>`+
-    `<div class="scryRow">${revealed.map((c,i)=>`<div class="card scryCard${rarityClass(c)}" data-i="${i}">${cardFaceMarkup(c)}</div>`).join("")}</div>`;
+    `<div class="scryRow">${revealed.map((c,i)=>`<div class="card scryCard" data-i="${i}">${cardFaceMarkup(c)}</div>`).join("")}</div>`;
   oc.querySelectorAll(".scryCard").forEach(el=>{
     el.onclick=()=>resolveScry(side,revealed,+el.dataset.i);
   });
@@ -1526,19 +1496,12 @@ function spawnFrenzyArc(fromRect,toRect){
 function spawnTrickPreview(card,x,y){
   const art=artFor(card.n);
   const artHtml = art ? `<img src="${art}" alt="${card.n}">` : `<span class="tpEmoji">${card.e}</span>`;
-  const descHtml = card.d ? `<div class="tpDesc">${card.d}</div>` : "";
   const el=document.createElement("div");
   el.className="trickPreview";
-  el.innerHTML=`<div class="tpArt">${artHtml}</div><div class="tpName">${card.n}</div>${descHtml}`;
+  el.innerHTML=`<div class="tpArt">${artHtml}</div><div class="tpName">${card.n}</div>`;
   el.style.left=x+"px"; el.style.top=y+"px";
   document.body.appendChild(el);
-  // the description line is wide enough that a lane-1/lane-5 target (near a screen edge)
-  // would otherwise clip off-screen — nudge it back on. offsetWidth ignores the entry
-  // animation's transform:scale, so it reads the box's true final width even at frame 1.
-  const halfW=el.offsetWidth/2, pad=8;
-  const clampedX=Math.min(Math.max(x,halfW+pad),window.innerWidth-halfW-pad);
-  if(clampedX!==x) el.style.left=clampedX+"px";
-  setTimeout(()=>el.remove(),2600); // keep in sync with the .trickPreview animation-duration above
+  setTimeout(()=>el.remove(),950);
 }
 /* the losing minion shatters in place; caller awaits before removing it from state so the exit is seen, not skipped */
 function playDeath(cellEl,variant){
@@ -1600,7 +1563,6 @@ function render(){
     else if(selCard.fx.k==="buff") hint("Tap one of your minions · tap elsewhere to cancel");
     else if(selCard.fx.k==="destroy") hint("Tap an enemy minion · tap elsewhere to cancel");
     else if(selCard.fx.k==="buffHand") hint("Tap a minion in your hand to buff it · tap elsewhere to cancel");
-    else if(selCard.fx.k==="transfigure") hint("Tap a card in your hand to transform it · tap elsewhere to cancel");
     else hint("Tap the card again to cast");
   } else if(S.phase==="combat") hint("Lanes fight left to right — minions trade simultaneously");
   else hint("Tap a card to play it, or end the phase");
@@ -1666,16 +1628,13 @@ function renderHand(selCard){
   const handEl=$("hand"); handEl.innerHTML="";
   if(S.phase==="combat"||S.over||S.handoff||isAiTurn()){ updateHandFade(); return; } // AI's hand stays hidden
   const buffHandSel = selCard && selCard.t==="t" && selCard.fx.k==="buffHand";
-  const transfigureSel = selCard && selCard.t==="t" && selCard.fx.k==="transfigure";
   P(S.active).hand.forEach((card,i)=>{
     const el=document.createElement("div");
-    el.className="card"+rarityClass(card);
+    el.className="card";
     if(!canPlayCard(card)) el.classList.add("unplayable");
     if(S.sel===i) el.classList.add("selected");
     // while a hand-buff trick is selected, spotlight the other minions it can target
     if(buffHandSel && i!==S.sel && card.t==="m") el.classList.add("validHandTarget");
-    // Transfigure can target any card type in hand except itself
-    if(transfigureSel && i!==S.sel) el.classList.add("validHandTarget");
     el.innerHTML=cardFaceMarkup(card);
     el.onclick=()=>onCardTap(i);
     handEl.appendChild(el);
@@ -1687,8 +1646,8 @@ function renderHand(selCard){
 let compendiumBuilt=false;
 function renderCompendium(){
   if(compendiumBuilt) return;
-  $("compPlantGrid").innerHTML = PLANT_POOL.map(c=>`<div class="card${rarityClass(c)}${isCoreCard(c.n)?' coreCard':''}" data-name="${c.n}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}${coreBadgeHtml(c.n)}</div>`).join("");
-  $("compZombieGrid").innerHTML = ZOMBIE_POOL.map(c=>`<div class="card zSide${rarityClass(c)}${isCoreCard(c.n)?' coreCard':''}" data-name="${c.n}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}${coreBadgeHtml(c.n)}</div>`).join("");
+  $("compPlantGrid").innerHTML = PLANT_POOL.map(c=>`<div class="card${isCoreCard(c.n)?' coreCard':''}" data-name="${c.n}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}${coreBadgeHtml(c.n)}</div>`).join("");
+  $("compZombieGrid").innerHTML = ZOMBIE_POOL.map(c=>`<div class="card zSide${isCoreCard(c.n)?' coreCard':''}" data-name="${c.n}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}${coreBadgeHtml(c.n)}</div>`).join("");
   compendiumBuilt=true;
 }
 /* zoomed-in card view: bigger art, full stats, and a flavor quote if one exists */
@@ -1707,15 +1666,6 @@ function zoomCard(card){
   const descHtml = card.d ? `<p>${card.d}</p>` : "";
   const flavor = flavorFor(card);
   const flavorHtml = flavor ? `<p class="zFlavor">${flavor}</p>` : "";
-  // recolor the modal purple for a Regime card instead of always defaulting to
-  // the Otherworld's green — same lookup used to tint compendium/deckbuilder cards
-  const zombieCard = ZOMBIE_POOL.some(c=>c.n===card.n);
-  $("overlayCard").classList.toggle("zSide", zombieCard);
-  // carry the card's rarity border into the zoomed view too — clear any rarity class
-  // left over from a previous zoom before applying this card's own (if it has one)
-  $("overlayCard").classList.remove("rarity-rare","rarity-epic","rarity-legendary");
-  const rc=rarityClass(card).trim();
-  if(rc) $("overlayCard").classList.add(rc);
   $("overlayCard").innerHTML = `
     <div class="zArt">${artHtml}</div>
     <h2>${card.n}</h2>
@@ -1723,11 +1673,7 @@ function zoomCard(card){
     ${kwHtml}${descHtml}${flavorHtml}
     <button id="closeZoom">Close</button>`;
   $("overlay").classList.remove("hidden");
-  $("closeZoom").onclick=()=>{
-    $("overlay").classList.add("hidden");
-    $("overlayCard").classList.remove("zSide","rarity-rare","rarity-epic","rarity-legendary");
-    if(S) render();
-  };
+  $("closeZoom").onclick=()=>{ $("overlay").classList.add("hidden"); if(S) render(); };
 }
 /* tapping a minion already on the board (no card selected) opens the same zoomed
    view as the compendium — base card info (cost/keyword text/flavor) merged with
@@ -1948,7 +1894,7 @@ function renderDeckEditor(){
           <button class="ctlBtn" data-n="${escapeHtml(c.n)}" data-d="1"${(n>=MAX_COPIES||ct>=DECK_SIZE)?' disabled':''}>＋</button>
         </div>`;
     return `<div class="deckCardWrap${n?' inDeck':''}">
-      <div class="card${side==="zombie"?' zSide':''}${rarityClass(c)}${isCoreCard(c.n)?' coreCard':''}" data-name="${escapeHtml(c.n)}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}${coreBadgeHtml(c.n)}${n?`<div class="haveBadge">×${n}</div>`:""}</div>
+      <div class="card${side==="zombie"?' zSide':''}${isCoreCard(c.n)?' coreCard':''}" data-name="${escapeHtml(c.n)}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}${coreBadgeHtml(c.n)}${n?`<div class="haveBadge">×${n}</div>`:""}</div>
       ${ctl}</div>`;
   }).join("");
   $("deckBody").innerHTML=`<div class="deckEditorLayout">${deckContentsHtml(side,deck,ro)}<div class="deckPoolArea">${meta}<div class="compGrid deckGrid">${grid}</div></div></div>`;
@@ -2047,6 +1993,8 @@ $("deckBody").addEventListener("click", e=>{
 });
 $("resumeBtn").onclick=resumeGame;
 $("compendiumBtn").onclick=()=>{ renderCompendium(); showScreen("compendiumScreen"); };
+$("devUnlockBtn").onclick=toggleDevUnlock;
+updateDevUnlockBtn();
 $("compendiumScreen").querySelector(".screenBody").addEventListener("click", e=>{
   const cardEl=e.target.closest(".card");
   if(!cardEl) return;
