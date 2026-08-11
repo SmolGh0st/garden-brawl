@@ -239,7 +239,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .impactFx, .pierceBeam, .frenzyArc, .cell.dying, .trickPreview, .fxTag { animation-duration:1ms !important; }
+    .impactFx, .pierceBeam, .frenzyArc, .cell.dying, .trickPreview, .fxTag, .card.cardPulse { animation-duration:1ms !important; }
   }
 
   .cell .mEmoji { font-size:26px; line-height:1.1; }
@@ -308,6 +308,14 @@
      is irrelevant to whether a card can be targeted — only trick-eligibility matters, so
      this replaces .unplayable's grayscale/lock treatment for the duration of that selection */
   .card.invalidHandTarget { border-color:#6b6b6b !important; border-style:solid; opacity:0.6; }
+  /* buffHand/Transfigure resolve instantly with no other visual change to the hand card
+     itself, so this pulse is the only thing marking *which* card was actually affected —
+     colored to match the trick type (green = stat buff, purple = transfigure), same
+     color language as the floaters castTrick() already spawns for these effects */
+  @keyframes cardPulse { 0%,100% { transform:scale(1); } 40% { transform:scale(1.16); } }
+  .card.cardPulse { animation:cardPulse 650ms cubic-bezier(0.16,1,0.3,1); z-index:5; }
+  .card.cardPulse--buff { box-shadow:0 0 18px #7fe06dcc, 0 2px 6px #0007, inset 0 1px 0 #ffffff14 !important; border-color:#7fe06d !important; }
+  .card.cardPulse--transfigure { box-shadow:0 0 18px #c9a2ffcc, 0 2px 6px #0007, inset 0 1px 0 #ffffff14 !important; border-color:#c9a2ff !important; }
   /* drag-and-drop: the source card dims in place while its floating clone follows the
      pointer/finger; the clone is a straight visual copy so rarity borders etc. still show */
   .card.dragSource { opacity:0.32; }
@@ -887,6 +895,8 @@ const sleep = ms => new Promise(r=>setTimeout(r,ms));
 const otherSide = s => s==="plant" ? "zombie" : "plant";
 let S = null;
 let uiLock = false;
+let trickBusy = false; // true while a just-cast trick's floating preview is still on screen
+const TRICK_PREVIEW_MS = 2600; // must match .trickPreview's animation-duration and the JS removal timeout below
 function P(s){ return S.players[s]; }
 function sideName(s){ return s==="plant" ? "⚔️ Otherworld" : "🎖️ Regime"; }
 function kwSymbols(m){ return m.kw.map(k=>({deadly:"☠️",armored:"🛡️",strike:"⤳",frenzy:"🔥"}[k])).join(""); }
@@ -910,7 +920,7 @@ function loadSave(){
 function resumeGame(){
   const s=loadSave();
   if(!s){ $("resumeBtn").classList.add("hidden"); return; }
-  S=s; uiLock=false;
+  S=s; uiLock=false; trickBusy=false;
   showScreen("app");
   if(isAiGame()){
     // solo game: no pass screen needed; if the save landed mid-AI-turn, restart the AI's phase
@@ -939,6 +949,7 @@ function buildDeckFrom(side,cards){
   return shuffle(deck);
 }
 function newGame(mode,aiSide,deckIds){
+  uiLock=false; trickBusy=false;
   deckIds=deckIds||{};
   const ids={ plant:deckIds.plant||"starter", zombie:deckIds.zombie||"starter" };
   // fall back to the starter if a chosen deck was deleted or edited below 40 since
@@ -1037,6 +1048,10 @@ function onCardTap(i){
   const hand=P(S.active).hand;
   const card=hand[i];
   if(!card) return;
+  // block starting a new trick while the last one's preview is still resolving — trickBusy
+  // only stops the *first* tap that would select a trick; targeting a trick already
+  // selected before the lock kicked in (S.sel===i) is never in this state, see castTrick
+  if(trickBusy && card.t==="t" && S.sel!==i){ hint("Wait for the current trick to finish"); return; }
   // a hand-targeting trick is already selected — tapping a DIFFERENT minion in hand
   // casts it there, instead of switching the selection to that card
   if(S.sel!==null && S.sel!==i){
@@ -1117,7 +1132,7 @@ function startCardDrag(e,index,el){
   if(dragCand||uiLock||S.over||S.phase==="combat"||isAiTurn()) return;
   const card=P(S.active).hand[index];
   if(!card||!dragEligible(card)) return;
-  dragCand={index,el,startX:e.clientX,startY:e.clientY,pointerId:e.pointerId,dragging:false,cloneEl:null,hoverEl:null,liveEl:null};
+  dragCand={index,el,startX:e.clientX,startY:e.clientY,pointerId:e.pointerId,dragging:false,cloneEl:null,hoverEls:null,liveEl:null};
   // listeners live on `document`, not the card element itself — selecting the card
   // (below, once the drag threshold is crossed) triggers a render() that rebuilds the
   // whole hand strip and detaches the original card node, which would silently kill
@@ -1179,12 +1194,21 @@ function dragHitTest(x,y){
 function updateDragHover(cand,x,y){
   const hit=dragHitTest(x,y);
   const newEl=(hit&&hit.el!==cand.liveEl)?hit.el:null;
-  if(cand.hoverEl&&cand.hoverEl!==newEl) cand.hoverEl.classList.remove("dragHover","dragHoverOk","dragHoverBad");
-  if(newEl&&cand.hoverEl!==newEl){
+  // environments land on the whole lane (both sides get the effect), so their hover ring
+  // should highlight both of the lane's cells, not just the single row under the pointer —
+  // matches how the static tap-select highlight already lights up both rows (see the
+  // selCard.t==="e" branch in the cell-rendering loop)
+  const draggedCard=P(S.active).hand[cand.index];
+  const pairEl=(draggedCard&&draggedCard.t==="e"&&hit&&hit.type==="cell")
+    ? $(`cell-${hit.side==="plant"?"zombie":"plant"}-${hit.lane}`)
+    : null;
+  const newHoverEls=newEl ? (pairEl ? [newEl,pairEl] : [newEl]) : [];
+  (cand.hoverEls||[]).forEach(el=>{ if(!newHoverEls.includes(el)) el.classList.remove("dragHover","dragHoverOk","dragHoverBad"); });
+  if(newHoverEls.length){
     const ok=newEl.classList.contains("validSpot")||newEl.classList.contains("validTarget")||newEl.classList.contains("targetable");
-    newEl.classList.add("dragHover",ok?"dragHoverOk":"dragHoverBad");
+    newHoverEls.forEach(el=>el.classList.add("dragHover",ok?"dragHoverOk":"dragHoverBad"));
   }
-  cand.hoverEl=newEl;
+  cand.hoverEls=newHoverEls;
 }
 function onCardDragEnd(e){
   const cand=dragCand;
@@ -1201,7 +1225,7 @@ function endCardDrag(cand,resolveTarget,x,y){
   document.removeEventListener("pointerup",onCardDragEnd);
   document.removeEventListener("pointercancel",onCardDragCancel);
   if(cand.dragging){
-    if(cand.hoverEl) cand.hoverEl.classList.remove("dragHover","dragHoverOk","dragHoverBad");
+    (cand.hoverEls||[]).forEach(el=>el.classList.remove("dragHover","dragHoverOk","dragHoverBad"));
     if(cand.cloneEl) cand.cloneEl.remove();
     if(resolveTarget) resolveDrop(cand,x,y); else cancelSel();
   }
@@ -1250,14 +1274,27 @@ function playEnvironment(idx,lane){
   render();
 }
 function castTrick(idx,target){
+  if(trickBusy){ hint("Wait for the current trick to finish"); return; }
   const side=S.active, card=P(side).hand[idx], fx=card.fx;
   if(S.acted) S.acted[side]=true;
+  // block casting another trick until this one's floating preview has fully played out —
+  // keeps board state legible instead of tricks stacking/overlapping mid-animation
+  trickBusy=true;
+  setTimeout(()=>{ trickBusy=false; }, TRICK_PREVIEW_MS);
 
   // show a brief floating preview of the trick's art/name over wherever it landed —
   // captured before anything moves or gets removed from the board
   let anchorEl=null;
   if(target && target.hero) anchorEl=$(heroBarId(target.hero));
   else if(target && target.lane!==undefined) anchorEl=$(`cell-${target.side}-${target.lane}`);
+  else if(target && target.handCardRef){
+    // buffHand/Transfigure target a specific card already in hand — anchor the preview to
+    // that card's current on-screen position, same as it hovers in front of a targeted
+    // minion on the board, instead of the hero bar (which doesn't say *which* card changed)
+    const targetIdx=P(side).hand.indexOf(target.handCardRef);
+    const cardEls=[...$("hand").children];
+    anchorEl=cardEls[targetIdx]||null;
+  }
   else if(fx.k==="heal" || fx.k==="draw" || fx.k==="scry") anchorEl=$(heroBarId(side)); // affects the caster
   else if(fx.k==="aoe") anchorEl=$(heroBarId(otherSide(side)));              // hits the enemy side
   if(anchorEl){
@@ -1269,6 +1306,7 @@ function castTrick(idx,target){
   P(side).hand.splice(idx,1);
   addLog(`${card.e}${card.n} cast`);
   S.sel=null;
+  let pulseHandIdx=-1, pulseVariant=null;
   if(fx.k==="draw") draw(side,fx.n);
   else if(fx.k==="heal"){
     const p=P(side), healed=Math.min(20,p.hp+fx.n)-p.hp;
@@ -1303,6 +1341,7 @@ function castTrick(idx,target){
       if(fx.stat==="a") t.a=(t.a||0)+fx.n;
       else t.h=(t.h||0)+fx.n;
       addLog(`${card.e}${card.n} gives ${t.e}${t.n} in hand +${fx.n} ${fx.stat==="a"?"Attack":"HP"}`);
+      pulseHandIdx=P(side).hand.indexOf(t); pulseVariant="buff";
     }
   }
   else if(fx.k==="transfigure"){
@@ -1320,10 +1359,21 @@ function castTrick(idx,target){
         if(idx>-1) P(side).hand[idx]=newCard;
         addLog(`${card.e}${card.n} turns ${t.e}${t.n} into ${newCard.e}${newCard.n}!`);
         floaterAtEl($(heroBarId(side)),"🔄","#c9a2ff");
+        pulseHandIdx=idx; pulseVariant="transfigure";
       }
     }
   }
   render();
+  // pulse whichever hand card just got buffed/transfigured so it's obvious which one it
+  // was — render() just rebuilt #hand from scratch, so grab the fresh element by index
+  if(pulseHandIdx>-1 && pulseVariant){
+    const el=[...$("hand").children][pulseHandIdx];
+    if(el){
+      el.scrollIntoView({inline:"center",block:"nearest",behavior:"smooth"});
+      el.classList.add("cardPulse","cardPulse--"+pulseVariant);
+      setTimeout(()=>el.classList.remove("cardPulse","cardPulse--"+pulseVariant), 700);
+    }
+  }
 }
 
 /* ============ SCRY: reveal N, keep 1, shuffle rest back — hard-blocking modal, no cancel ============ */
@@ -1805,7 +1855,7 @@ function spawnTrickPreview(card,x,y){
   const halfW=el.offsetWidth/2, pad=8;
   const clampedX=Math.min(Math.max(x,halfW+pad),window.innerWidth-halfW-pad);
   if(clampedX!==x) el.style.left=clampedX+"px";
-  setTimeout(()=>el.remove(),2600); // keep in sync with the .trickPreview animation-duration above
+  setTimeout(()=>el.remove(),TRICK_PREVIEW_MS); // keep in sync with the .trickPreview animation-duration above
 }
 /* the losing minion shatters in place; caller awaits before removing it from state so the exit is seen, not skipped */
 function playDeath(cellEl,variant){
