@@ -2293,21 +2293,26 @@ function renderDeckEditor(){
       <span class="pill ${ct===DECK_SIZE?'ok':'bad'}">🃏 ${ct}/${DECK_SIZE}</span>
       <span class="pill">⚔ ${minions} minions</span><span class="pill">✨ ${tricks} tricks</span><span class="pill">🌍 ${envs} environments</span>
     </div>
+    <p class="deckRules">Greyed-out 🔒 cards below aren't owned yet, so they can't be added.</p>
     <div class="deckActions">${ro
       ? `<button class="btn small" id="dCopyBtn">📋 Copy to new deck</button><span class="dTag">Starter — view only</span>`
       : `<button class="btn small" id="dRenameBtn">✏️ Rename</button><button class="btn small" id="dCopyBtn">📋 Duplicate</button><button class="btn small danger" id="dDelBtn">🗑 Delete</button>`}
     </div>`;
   const grid=poolFor(side).map(c=>{
     const n=deck.cards[c.n]||0;
+    // capped by what's actually owned (0 for anything outside the Core Set today) rather
+    // than the flat MAX_COPIES rule — a deck can still hold more than that if it already
+    // had cards added from before ownership was enforced here, this just stops adding more
+    const cap=Math.min(MAX_COPIES,ownedCopies(c.n));
     const ctl = ro
       ? `<div class="cardCtl"><span class="ctlCount">×${n}</span></div>`
       : `<div class="cardCtl">
           <button class="ctlBtn" data-n="${escapeHtml(c.n)}" data-d="-1"${n===0?' disabled':''}>−</button>
           <span class="ctlCount">${n}</span>
-          <button class="ctlBtn" data-n="${escapeHtml(c.n)}" data-d="1"${(n>=MAX_COPIES||ct>=DECK_SIZE)?' disabled':''}>＋</button>
+          <button class="ctlBtn" data-n="${escapeHtml(c.n)}" data-d="1"${(n>=cap||ct>=DECK_SIZE)?' disabled':''} title="${cap===0?'Not owned yet':''}">＋</button>
         </div>`;
     return `<div class="deckCardWrap${n?' inDeck':''}">
-      <div class="card${side==="zombie"?' zSide':''}${rarityClass(c)}${isCoreCard(c.n)?' coreCard':''}" data-name="${escapeHtml(c.n)}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':''}">${cardFaceMarkup(c)}${coreBadgeHtml(c.n)}${n?`<div class="haveBadge">×${n}</div>`:""}</div>
+      <div class="card${side==="zombie"?' zSide':''}${rarityClass(c)}${isCoreCard(c.n)?' coreCard':' unowned'}" data-name="${escapeHtml(c.n)}" title="${isCoreCard(c.n)?'Core Set — you own 4 copies':'Not owned yet'}">${cardFaceMarkup(c)}${coreBadgeHtml(c.n)}${n?`<div class="haveBadge">×${n}</div>`:""}</div>
       ${ctl}</div>`;
   }).join("");
   $("deckBody").innerHTML=`<div class="deckEditorLayout">${deckContentsHtml(side,deck,ro)}<div class="deckPoolArea">${meta}<div class="compGrid deckGrid">${grid}</div></div></div>`;
@@ -2322,7 +2327,12 @@ function renderDeckEditor(){
 function bumpCard(side,id,name,d){
   const deck=DECKS[side].find(x=>x.id===id); if(!deck) return;
   const cur=deck.cards[name]||0, total=deckCount(deck.cards);
-  if(d>0 && (cur>=MAX_COPIES || total>=DECK_SIZE)) return;
+  // enforced here too, not just via the pool button's disabled attribute — this is the
+  // actual data mutation, so it's the one place that has to be right regardless of how
+  // it's called. A card already in a deck from before ownership was enforced is left
+  // alone (cur can exceed the cap); this only blocks going higher.
+  const cap=Math.min(MAX_COPIES,ownedCopies(name));
+  if(d>0 && (cur>=cap || total>=DECK_SIZE)) return;
   const next=Math.max(0,cur+d);
   if(next===0) delete deck.cards[name]; else deck.cards[name]=next;
   saveDecks(); renderDeckEditor();
