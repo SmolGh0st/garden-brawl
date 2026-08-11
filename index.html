@@ -38,21 +38,40 @@
     .card .cArt .cEmoji{ font-size:32px; }
     .card .cName{ font-size:10px; }
     .card .cDesc{ font-size:9px; }
-    .herobar .face{ font-size:32px; }
+    .herobar .face{ width:46px; height:46px; font-size:24px; border-radius:12px; }
     #hand{ padding:6px 4px 10px; }
     #handWrap{ padding:6px 10px 12px; }
   }
 
   /* hero bars */
-  .herobar { display:flex; align-items:center; gap:8px; padding:6px 10px; }
-  .herobar .face { font-size:26px; }
-  .herobar .stats { display:flex; gap:6px; flex:1; align-items:center; flex-wrap:wrap; }
-  .pill { background:#00000055; border:1px solid #ffffff22; border-radius:12px; padding:2px 8px; font-size:12px; font-weight:600; }
-  .pill.hp { border-color:#e05555aa; }
-  .pill.res { border-color:#e0c14faa; }
+  .herobar { display:flex; align-items:center; gap:10px; padding:7px 10px; }
+  .herobar .face {
+    flex-shrink:0; width:38px; height:38px; border-radius:10px; font-size:20px;
+    display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(circle at 32% 28%, var(--fac-2), var(--fac-3) 70%);
+    border:1px solid var(--fac-1); box-shadow:0 2px 8px #0006, inset 0 1px 0 #ffffff22;
+  }
+  .herobar .stats { display:flex; flex-direction:column; gap:5px; flex:1; min-width:0; }
+  .heroNameRow { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+  .heroNameRow .heroName { font-size:12.5px; font-weight:700; letter-spacing:0.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .heroNameRow .heroHpText { font-size:11px; font-weight:700; color:#ffb0b0; font-variant-numeric:tabular-nums; flex-shrink:0; }
+  .hpTrack { height:6px; border-radius:4px; background:#00000055; overflow:hidden; box-shadow:inset 0 1px 2px #0008; }
+  .hpFill { height:100%; width:100%; border-radius:4px; background:linear-gradient(90deg,#ff6b6b,#ff9b6b); transform-origin:0 50%; transition:transform .45s cubic-bezier(.16,1,.3,1); }
+  .heroMetaRow { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .heroMetaItem { display:flex; align-items:center; gap:4px; color:#c7cdba; }
+  .heroMetaItem svg { flex-shrink:0; color:var(--fac-1); opacity:0.9; }
+  .heroMetaItem .metaNum { font-size:11.5px; font-weight:700; font-variant-numeric:tabular-nums; color:#e6e9db; }
   .herobar.targetable { outline:2px solid #ffd75e; border-radius:10px; animation:pulse 0.8s infinite alternate; }
-  #zombieBar { background:linear-gradient(180deg,#2b1f33,#1d1526); border-bottom:1px solid #ffffff14; order:0; }
-  #plantBar  { background:linear-gradient(0deg,#1e3020,#152417); border-top:1px solid #ffffff14; order:3; }
+  #zombieBar {
+    --fac-1:#c9a2ff; --fac-2:#5c3a8f; --fac-3:#241832;
+    background:linear-gradient(180deg,#2b1f33,#1d1526); border-bottom:1px solid #ffffff14; order:0;
+    box-shadow:inset 0 -1px 0 #c9a2ff1c;
+  }
+  #plantBar  {
+    --fac-1:#8fbf7a; --fac-2:#3a5c2c; --fac-3:#182410;
+    background:linear-gradient(0deg,#1e3020,#152417); border-top:1px solid #ffffff14; order:3;
+    box-shadow:inset 0 1px 0 #8fbf7a1c;
+  }
   @keyframes pulse { from{outline-color:#ffd75e55;} to{outline-color:#ffd75e;} }
 
   /* whoever's turn it is sits at the bottom, nearest the player holding the phone —
@@ -166,6 +185,26 @@
     100% { transform:translate(var(--dx),var(--dy)) scale(0.85) rotate(20deg); opacity:0; }
   }
 
+  /* combat call-out tags: a short readable label riding along with the deadly/strikethrough/
+     frenzy fx above, so what just happened is obvious without reading the log line */
+  .fxTag {
+    position:fixed; z-index:66; pointer-events:none;
+    transform:translate(-50%,-70%) scale(0.5); opacity:0;
+    font-size:10.5px; font-weight:800; letter-spacing:0.03em; text-transform:uppercase; white-space:nowrap;
+    padding:3px 9px; border-radius:7px;
+    animation:fxTagPop 900ms cubic-bezier(0.16,1,0.3,1) forwards;
+  }
+  @keyframes fxTagPop {
+    0%   { transform:translate(-50%,-70%) scale(0.5); opacity:0; }
+    18%  { transform:translate(-50%,-100%) scale(1.08); opacity:1; }
+    30%  { transform:translate(-50%,-100%) scale(1); opacity:1; }
+    78%  { transform:translate(-50%,-100%) scale(1); opacity:1; }
+    100% { transform:translate(-50%,-130%) scale(0.85); opacity:0; }
+  }
+  .fxTag--deadly  { background:#1c0a2ae0; border:1px solid #a366ff; color:#eaffe6; box-shadow:0 0 10px #a366ff77; }
+  .fxTag--strike  { background:#2a1a06e0; border:1px solid #ffb95e; color:#fff6d0; box-shadow:0 0 10px #ffb95e77; }
+  .fxTag--frenzy  { background:#2a1004e0; border:1px solid #ff6a3d; color:#ffe2d0; box-shadow:0 0 10px #ff6a3d77; }
+
   /* trick cast preview: pops up over the target, holds for a couple seconds so its
      effect text is actually readable, then blips out. Duration lives in one place —
      the JS setTimeout() removal below — keep the keyframe percentages in sync with it. */
@@ -200,7 +239,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .impactFx, .pierceBeam, .frenzyArc, .cell.dying, .trickPreview { animation-duration:1ms !important; }
+    .impactFx, .pierceBeam, .frenzyArc, .cell.dying, .trickPreview, .fxTag { animation-duration:1ms !important; }
   }
 
   .cell .mEmoji { font-size:26px; line-height:1.1; }
@@ -380,13 +419,6 @@
   .deckRules { font-size:11px; color:#9aa88f; margin:0 0 12px; }
   .coreLegend { display:inline-flex; align-items:center; gap:4px; margin-left:6px; }
   .coreSwatch { width:12px; height:12px; border-radius:4px; background:#2f3d2a; box-shadow:0 0 0 2px #d4d4d4; display:inline-block; }
-  /* dev-only testing toggle — deliberately styled to look like a tool, not a normal
-     game control: dashed border, monospace-ish, muted until switched on */
-  .devBtn {
-    display:block; margin:0 0 14px; font-size:11px; padding:6px 10px;
-    background:#ffffff08; border:1px dashed #ffffff33; color:#9aa88f;
-  }
-  .devBtn.devOn { background:#7fe06d22; border-color:#7fe06d88; color:#c9f5be; }
   .deckRow {
     display:flex; align-items:center; gap:10px; padding:11px 12px; margin-bottom:8px;
     background:#ffffff0a; border:1px solid #ffffff1c; border-radius:12px; cursor:pointer;
@@ -403,6 +435,7 @@
     background:#ffffff0d; border:1.5px dashed #ffffff2e; box-shadow:none; color:#b8c4a8; font-size:13px;
   }
   .deckMeta { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+  .pill { background:#00000055; border:1px solid #ffffff22; border-radius:12px; padding:2px 8px; font-size:12px; font-weight:600; }
   .deckMeta .pill.ok { border-color:#7fe06daa; }
   .deckMeta .pill.bad { border-color:#ff6b6baa; color:#ff9b9b; }
   .deckActions { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
@@ -516,7 +549,6 @@
   </div>
   <div class="screenBody">
     <p class="deckRules"><span class="coreLegend"><span class="coreSwatch"></span>Core Set — the ×4 badge shows what you own</span></p>
-    <button class="btn small devBtn" id="devUnlockBtn" title="Testing only — marks every card as owned, everywhere it's shown">🔒 Dev: Unlock All (OFF)</button>
     <h3 class="compSectionTitle plantSection">⚔️ Otherworld</h3>
     <div class="compGrid" id="compPlantGrid"></div>
     <h3 class="compSectionTitle zombieSection">🎖️ Regime</h3>
@@ -535,11 +567,22 @@
   <div class="herobar" id="zombieBar">
     <div class="face">🎖️</div>
     <div class="stats">
-      <span style="font-weight:700;font-size:13px;">Generalissimo</span>
-      <span class="pill hp">❤️ <span id="zHp">20</span></span>
-      <span class="pill res">📜 <span id="zRes">0</span></span>
-      <span class="pill">🃏 <span id="zHand">0</span></span>
-      <span class="pill">📚 <span id="zDeck">0</span></span>
+      <div class="heroNameRow"><span class="heroName">Generalissimo</span><span class="heroHpText"><span id="zHp">20</span>/<span id="zHpMax">20</span></span></div>
+      <div class="hpTrack"><div class="hpFill" id="zHpFill"></div></div>
+      <div class="heroMetaRow">
+        <span class="heroMetaItem" title="Decrees available this turn">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M12 2 3 12l9 10 9-10z"/></svg>
+          <span class="metaNum" id="zRes">0</span>
+        </span>
+        <span class="heroMetaItem" title="Cards in hand">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M6 8l-3 4 3 4M18 8l3 4-3 4M14 4l-4 16"/></svg>
+          <span class="metaNum" id="zHand">0</span>
+        </span>
+        <span class="heroMetaItem" title="Cards left in deck">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 3v18M8 8h4"/></svg>
+          <span class="metaNum" id="zDeck">0</span>
+        </span>
+      </div>
     </div>
   </div>
   <div id="phaseBanner">—</div>
@@ -551,11 +594,22 @@
   <div class="herobar" id="plantBar">
     <div class="face">🗡️</div>
     <div class="stats">
-      <span style="font-weight:700;font-size:13px;">The Summoned</span>
-      <span class="pill hp">❤️ <span id="pHp">20</span></span>
-      <span class="pill res">🔷 <span id="pRes">0</span></span>
-      <span class="pill">🃏 <span id="pHand">0</span></span>
-      <span class="pill">📚 <span id="pDeck">0</span></span>
+      <div class="heroNameRow"><span class="heroName">The Summoned</span><span class="heroHpText"><span id="pHp">20</span>/<span id="pHpMax">20</span></span></div>
+      <div class="hpTrack"><div class="hpFill" id="pHpFill"></div></div>
+      <div class="heroMetaRow">
+        <span class="heroMetaItem" title="Mana available this turn">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M12 2 3 12l9 10 9-10z"/></svg>
+          <span class="metaNum" id="pRes">0</span>
+        </span>
+        <span class="heroMetaItem" title="Cards in hand">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M6 8l-3 4 3 4M18 8l3 4-3 4M14 4l-4 16"/></svg>
+          <span class="metaNum" id="pHand">0</span>
+        </span>
+        <span class="heroMetaItem" title="Cards left in deck">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 3v18M8 8h4"/></svg>
+          <span class="metaNum" id="pDeck">0</span>
+        </span>
+      </div>
     </div>
   </div>
   <div id="hintBar"></div>
@@ -579,7 +633,7 @@
    name to its path here. Any card without an entry keeps its emoji. Square-ish images look
    best (cropped to fit). Small thumbnails also appear on the board when the minion is placed.
    Example:  const CARD_ART = { "Foot Soldier":"art/foot-soldier.png", "Nut Wall":"art/nut-wall.jpg" };  */
-const CARD_ART = { "Communist Manifesto":"art/communist-manifesto.png", "Blessing":"art/blessing.png" };
+const CARD_ART = { "Communist Manifesto":"art/communist-manifesto.png" };
 function artFor(name){ return CARD_ART[name] || null; }
 
 /* CARD FLAVOR
@@ -721,27 +775,7 @@ const CORE_SET = new Set([
   "Saboteur","Shock Trooper","Riot Police","Cavalry Charge","Iron Curtain",
   "Communist Manifesto","Blitzkrieg","Requisition","Purge","Show Trial"
 ]);
-/* DEV UNLOCK — a testing-only toggle (Compendium button), not a real progression
-   system. While on, every card in the game (Environments, the Rare hand-buff
-   tricks, anything added later) reads as "owned" the same way Core Set cards do,
-   so ownership never gets in the way of testing new content. Persisted across
-   reloads via localStorage so it doesn't need re-toggling every session; entirely
-   separate from CORE_SET itself, which stays untouched as the real baseline. */
-let DEV_UNLOCK_ALL = localStorage.getItem('gbDevUnlockAll') === '1';
-function toggleDevUnlock(){
-  DEV_UNLOCK_ALL = !DEV_UNLOCK_ALL;
-  localStorage.setItem('gbDevUnlockAll', DEV_UNLOCK_ALL ? '1' : '0');
-  compendiumBuilt = false; // force the compendium grids to rebuild with the new badge state
-  renderCompendium();
-  updateDevUnlockBtn();
-  if(deckEd && !$("deckScreen").classList.contains("hidden")) renderDeckEditor();
-}
-function updateDevUnlockBtn(){
-  const btn = $("devUnlockBtn"); if(!btn) return;
-  btn.textContent = DEV_UNLOCK_ALL ? "🔓 Dev: Unlock All (ON)" : "🔒 Dev: Unlock All (OFF)";
-  btn.classList.toggle("devOn", DEV_UNLOCK_ALL);
-}
-function isCoreCard(name){ return DEV_UNLOCK_ALL || CORE_SET.has(name); }
+function isCoreCard(name){ return CORE_SET.has(name); }
 const MAX_COPIES_OWNED = 4;
 /* how many of a card we own — everything in the Core Set is owned at the deck-build
    cap (4); future non-core cards default to 0 until an unlock system exists. Used
@@ -1442,6 +1476,8 @@ async function resolveLane(lane){
     const zVariant = zDeadlyKill ? "deadly" : (zArmored ? "armored" : "normal");
     const pVariant = pDeadlyKill ? "deadly" : (pArmored ? "armored" : "normal");
     spawnImpactFx(zCell,zVariant); spawnImpactFx(pCell,pVariant);
+    if(zDeadlyKill) spawnFxTag(zCell.getBoundingClientRect(),"Deadly kill","deadly");
+    if(pDeadlyKill) spawnFxTag(pCell.getBoundingClientRect(),"Deadly kill","deadly");
     floaterAtCell(lane,"zombie",(zDeadlyKill?"☠":zArmored?"🛡":"")+"-"+dmgToZ, zDeadlyKill?"#c9a2ff":zArmored?"#8fd0ff":"#ff6b6b");
     floaterAtCell(lane,"plant",(pDeadlyKill?"☠":pArmored?"🛡":"")+"-"+dmgToP, pDeadlyKill?"#c9a2ff":pArmored?"#8fd0ff":"#ff6b6b");
     render();
@@ -1465,21 +1501,25 @@ async function resolveLane(lane){
     // corpse rule: a minion that died in the trade gets no Strikethrough or Frenzy follow-up —
     // the bonus hits belong to survivors only
     if(!pDied && p.kw.includes("strike") && !S.over){
-      spawnPierceBeam(pRect,$(heroBarId("zombie")).getBoundingClientRect());
+      const heroRect=$(heroBarId("zombie")).getBoundingClientRect();
+      spawnPierceBeam(pRect,heroRect); spawnFxTag(heroRect,"Strikethrough","strike");
       heroDamage("zombie",p.a); addLog("⤳ Strikethrough hits hero!");
     }
     if(!zDied && z.kw.includes("strike") && !S.over){
-      spawnPierceBeam(zRect,$(heroBarId("plant")).getBoundingClientRect());
+      const heroRect=$(heroBarId("plant")).getBoundingClientRect();
+      spawnPierceBeam(zRect,heroRect); spawnFxTag(heroRect,"Strikethrough","strike");
       heroDamage("plant",z.a); addLog("⤳ Strikethrough hits hero!");
     }
     if(zDied && !pDied && p.kw.includes("frenzy") && !S.over){
       await sleep(300); addLog("🔥 Frenzy! Bonus hit on hero");
-      spawnFrenzyArc(zRect,$(heroBarId("zombie")).getBoundingClientRect());
+      const heroRect=$(heroBarId("zombie")).getBoundingClientRect();
+      spawnFrenzyArc(zRect,heroRect); spawnFxTag(heroRect,"Frenzy bonus hit","frenzy");
       heroDamage("zombie",p.a);
     }
     if(pDied && !zDied && z.kw.includes("frenzy") && !S.over){
       await sleep(300); addLog("🔥 Frenzy! Bonus hit on hero");
-      spawnFrenzyArc(pRect,$(heroBarId("plant")).getBoundingClientRect());
+      const heroRect=$(heroBarId("plant")).getBoundingClientRect();
+      spawnFrenzyArc(pRect,heroRect); spawnFxTag(heroRect,"Frenzy bonus hit","frenzy");
       heroDamage("plant",z.a);
     }
   } else if(p){
@@ -1507,7 +1547,37 @@ function floaterAtEl(el,text,color){
 function floaterAtCell(lane,side,text,color){ floaterAtEl($(`cell-${side}-${lane}`),text,color); }
 function heroBarId(side){ return side==="plant" ? "plantBar" : "zombieBar"; }
 
+const HERO_MAX_HP=20;
+/* hero stat bar: hp fill + name/hp text + hand/deck counts + energy pips (filled = spendable now, out of this turn's max) */
+function renderHeroStats(side){
+  const pfx=side==="plant"?"p":"z", p=P(side);
+  $(pfx+"Hp").textContent=Math.max(0,p.hp);
+  $(pfx+"Res").textContent=Math.max(0,p.res);
+  $(pfx+"Hand").textContent=p.hand.length;
+  $(pfx+"Deck").textContent=p.deck.length;
+  const fill=$(pfx+"HpFill");
+  if(fill) fill.style.transform=`scaleX(${Math.max(0,Math.min(1,p.hp/HERO_MAX_HP))})`;
+}
+
 /* ============ COMBAT FX ============ */
+/* readable call-out riding above a deadly kill / strikethrough / frenzy moment — a11y note:
+   this is a supplementary visual, the addLog() line next to each call site carries the
+   same information for anyone relying on the log instead of the animation */
+function spawnFxTag(rect,text,variant){
+  if(!rect) return;
+  const el=document.createElement("div");
+  el.className="fxTag fxTag--"+variant;
+  el.textContent=text;
+  el.style.left=(rect.left+rect.width/2)+"px";
+  el.style.top=rect.top+"px";
+  document.body.appendChild(el);
+  // the rise animation travels ~1.3x the tag's own height above its anchor point — when the
+  // anchor sits near the very top of the screen (e.g. the opponent's hero bar), that would
+  // carry it off-screen, so floor the anchor far enough down to keep it fully visible
+  const minTop=el.offsetHeight*1.3+8;
+  if(rect.top<minTop) el.style.top=minTop+"px";
+  setTimeout(()=>el.remove(),900);
+}
 function spawnImpactFx(el,variant){
   if(!el) return;
   const r=el.getBoundingClientRect();
@@ -1585,10 +1655,7 @@ function hint(t){ $("hintBar").textContent=t; }
 /* ============ RENDER ============ */
 function render(){
   if(!S) return;
-  $("zHp").textContent=P("zombie").hp; $("zRes").textContent=P("zombie").res;
-  $("zHand").textContent=P("zombie").hand.length; $("zDeck").textContent=P("zombie").deck.length;
-  $("pHp").textContent=P("plant").hp; $("pRes").textContent=P("plant").res;
-  $("pHand").textContent=P("plant").hand.length; $("pDeck").textContent=P("plant").deck.length;
+  renderHeroStats("zombie"); renderHeroStats("plant");
 
   const phName={z1:"🎖️ Regime — play minions",p:"⚔️ Otherworld — play cards",z2:"🎖️ Regime — play tricks",combat:"⚔️ Combat!"}[S.phase]||"—";
   const order=["z1","p","z2","combat"], curIdx=order.indexOf(S.phase);
@@ -2075,8 +2142,6 @@ $("deckBody").addEventListener("click", e=>{
 });
 $("resumeBtn").onclick=resumeGame;
 $("compendiumBtn").onclick=()=>{ renderCompendium(); showScreen("compendiumScreen"); };
-$("devUnlockBtn").onclick=toggleDevUnlock;
-updateDevUnlockBtn();
 $("compendiumScreen").querySelector(".screenBody").addEventListener("click", e=>{
   const cardEl=e.target.closest(".card");
   if(!cardEl) return;
