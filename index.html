@@ -273,6 +273,11 @@
   @media (prefers-reduced-motion: reduce) {
     .impactFx, .pierceBeam, .frenzyArc, .cell.dying, .trickPreview, .fxTag, .card.cardPulse, .trickTargetRing { animation-duration:1ms !important; }
   }
+  /* manual equivalent of the media query above, driven by Settings → Animation speed →
+     Instant, for players who want it off without changing an OS-level setting */
+  body.forceReduceMotion .impactFx, body.forceReduceMotion .pierceBeam, body.forceReduceMotion .frenzyArc,
+  body.forceReduceMotion .cell.dying, body.forceReduceMotion .trickPreview, body.forceReduceMotion .fxTag,
+  body.forceReduceMotion .card.cardPulse, body.forceReduceMotion .trickTargetRing { animation-duration:1ms !important; }
 
   .cell .mEmoji { font-size:26px; line-height:1.1; }
   .cell .mName { font-size:8px; text-align:center; opacity:0.85; padding:0 2px; line-height:1.1; height:18px; overflow:hidden; }
@@ -385,7 +390,7 @@
   .card .trickTag.envTag { color:#9fd08a; }
 
   /* controls */
-  #controls { display:flex; gap:8px; padding:0 10px 10px; align-items:center; }
+  #controls { display:flex; flex-wrap:wrap; gap:8px; padding:0 10px 10px; align-items:center; }
   button.btn {
     flex:1; padding:11px; min-height:46px; border-radius:10px; border:none; font-size:14px; font-weight:700;
     background:linear-gradient(180deg,#5a8f4d,#3f6b35); color:#fff; box-shadow:0 2px 0 #2a4a24;
@@ -497,6 +502,50 @@
   @media (max-width:420px){
     .mullGrid .card.mullCard { flex:0 0 68px; height:98px; }
   }
+
+  /* settings overlay */
+  .settingRow { text-align:left; margin:14px 0; }
+  .settingLabel { font-size:13px; font-weight:700; color:#e8e6d8; margin:0 0 6px; }
+  .settingChoices { display:flex; gap:6px; }
+  .settingChoice { flex:1; margin-top:0 !important; padding:9px !important; font-size:13px !important; font-weight:600 !important;
+    background:#ffffff12 !important; border:1.5px solid #ffffff2e !important; color:#c9d4ba !important; }
+  .settingChoice.active { background:linear-gradient(180deg,#5a8f4d,#3f6b35) !important; border-color:#8fbf7a !important; color:#fff !important; }
+  #overlayCard.zSide .settingChoice.active { background:linear-gradient(180deg,#7a5aa0,#5a3f7a) !important; border-color:#c9a2ff !important; }
+  .settingHint { font-size:11px; color:#8a967f; margin:6px 0 0; }
+
+  /* lethal / hand-sort controls */
+  #lethalBadge { display:inline-flex; align-items:center; gap:4px; padding:4px 9px; border-radius:8px; font-size:12px; font-weight:800;
+    background:linear-gradient(180deg,#ffb95e,#e08a2e); color:#2a1a05; box-shadow:0 0 10px #ffb95e77; margin:0 6px; white-space:nowrap; }
+  #lethalBadge.hidden { display:none; }
+
+  /* mana curve graph */
+  .manaCurve { margin-top:14px; padding-top:10px; border-top:1px solid #ffffff1a; }
+  .curveBars { display:flex; align-items:flex-end; gap:4px; height:64px; }
+  .curveBar { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; }
+  .curveBarFill { width:100%; min-height:2px; background:linear-gradient(180deg,#8fbf7a,#4a7a3d); border-radius:3px 3px 0 0; display:flex; align-items:flex-start; justify-content:center; }
+  .manaCurve.zSide .curveBarFill { background:linear-gradient(180deg,#c9a2ff,#7a5aa0); }
+  .curveN { font-size:9px; font-weight:700; color:#0a0f08; margin-top:2px; }
+  .curveLabel { font-size:9px; color:#8a967f; margin-top:3px; }
+
+  /* rarity glyph — a non-color cue riding alongside the rarity border so rarity still
+     reads correctly for colorblind players or in greyscale, not just via border hue */
+  .rGlyph { font-size:9px; margin-left:2px; vertical-align:1px; }
+  .rGlyph-rare { color:#4aa8ff; }
+  .rGlyph-epic { color:#c964f0; }
+  .rGlyph-legendary { color:#ff9645; }
+  .kwTerm { border-bottom:1px dotted currentColor; cursor:help; }
+
+  /* battle log icon chips */
+  .logRow { display:flex; align-items:flex-start; gap:8px; margin:3px 0; }
+  .logIcon { font-size:16px; flex:0 0 auto; line-height:1.4; }
+  .logText { flex:1; }
+
+  /* match stats */
+  .statsTable { width:100%; border-collapse:collapse; font-size:12px; text-align:left; }
+  .statsTable th, .statsTable td { padding:5px 6px; border-bottom:1px solid #ffffff14; }
+  .statsTable th { color:#8a967f; font-weight:600; }
+  .statsWin { color:#7fe06d; font-weight:700; }
+  .statsLoss { color:#ff8c82; font-weight:700; }
 
   /* deck builder */
   .deckRules { font-size:11px; color:#9aa88f; margin:0 0 12px; }
@@ -634,6 +683,8 @@
     <button class="homeBtn primary" id="playBtn">👥 2 Players</button>
     <button class="homeBtn secondary" id="decksBtn">🃏 Deck Builder</button>
     <button class="homeBtn secondary" id="compendiumBtn">📖 Compendium</button>
+    <button class="homeBtn secondary" id="statsHomeBtn">📊 Match Stats</button>
+    <button class="homeBtn secondary" id="settingsHomeBtn">⚙️ Settings</button>
   </div>
 </div>
 <div id="compendiumScreen" class="screen hidden">
@@ -713,7 +764,9 @@
   <div id="handWrap"><div id="hand"></div></div>
   <div id="controls">
     <button class="btn small" id="homeBtn" title="Main Menu">🏠</button>
+    <button class="btn small" id="settingsBtn" title="Settings">⚙️</button>
     <button class="btn small" id="helpBtn">?</button>
+    <button class="btn small hidden" id="sortBtn" title="Sort your hand">⇅ Sort</button>
     <button class="btn small hidden" id="mullBtn">🔄 Mulligan</button>
     <button class="btn" id="endBtn">End Phase</button>
     <button class="btn small" id="newBtn">New</button>
@@ -901,6 +954,79 @@ function ownedCopies(name){ return isCoreCard(name) ? MAX_COPIES_OWNED : 0; }
    (top-left, mana cost) was easy to mistake for a copies-owned count since nothing
    else showed that number on the card face. This sits opposite it, top-right. */
 function coreBadgeHtml(name){ return isCoreCard(name) ? `<div class="ownBadge">×${MAX_COPIES_OWNED}</div>` : ""; }
+
+/* ============ SETTINGS ============ */
+/* One localStorage-backed settings object instead of separate flags per feature (the
+   pattern DEV_UNLOCK_ALL above already used) — animSpeed drives the ANIM_SPEED multiplier
+   sleep() reads on every await, so it touches every animation/pacing beat in the game from
+   one knob instead of threading a setting through combat/trick/scry code individually.
+   firstTips gates the one-time explainer toasts (see maybeFirstTip below). No sound toggle
+   here on purpose — the game has no audio yet, so a toggle for it would just be a lie. */
+const SETTINGS_KEY = "gbSettings";
+function loadSettings(){
+  try{
+    const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY));
+    if(raw && typeof raw==="object") return {animSpeed:"normal", firstTips:true, ...raw};
+  }catch(e){}
+  return {animSpeed:"normal", firstTips:true};
+}
+let SETTINGS = loadSettings();
+let ANIM_SPEED = 1;
+function saveSettings(){ try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(SETTINGS)); }catch(e){} }
+function applySettings(){
+  ANIM_SPEED = {normal:1, fast:0.4, instant:0.05}[SETTINGS.animSpeed] ?? 1;
+  // reuses the exact same selector list as the prefers-reduced-motion media query above,
+  // just gated by a manual class instead of the OS setting — "Instant" gets both the
+  // shortened sleep()s AND the near-zero keyframe durations, so it actually feels instant
+  // instead of just "the pauses are shorter but the swing animation still plays out."
+  document.body.classList.toggle("forceReduceMotion", SETTINGS.animSpeed==="instant");
+}
+function showSettingsOverlay(){
+  if(uiLock) return;
+  const speedOpt=(v,label)=>`<button class="settingChoice${SETTINGS.animSpeed===v?' active':''}" data-speed="${v}">${label}</button>`;
+  $("overlayCard").innerHTML=`<h2>⚙️ Settings</h2>
+    <div class="settingRow">
+      <p class="settingLabel">Animation speed</p>
+      <div class="settingChoices">${speedOpt("normal","Normal")}${speedOpt("fast","Fast")}${speedOpt("instant","Instant")}</div>
+      <p class="settingHint">Instant also skips the visual flourishes (same as your OS's reduce-motion setting).</p>
+    </div>
+    <div class="settingRow">
+      <p class="settingLabel">First-time tips</p>
+      <div class="settingChoices">
+        <button class="settingChoice${SETTINGS.firstTips?' active':''}" data-tips="1">On</button>
+        <button class="settingChoice${!SETTINGS.firstTips?' active':''}" data-tips="0">Off</button>
+      </div>
+      <p class="settingHint">One-time explainer the first time you hit Scry, Environments, or a hand-targeting trick.</p>
+      <button class="btn small" id="resetTipsBtn" style="margin-top:6px;">↺ Reset seen tips</button>
+    </div>
+    <button id="closeSettings">Close</button>`;
+  $("overlay").classList.remove("hidden");
+  $("overlayCard").querySelectorAll("[data-speed]").forEach(b=>{
+    b.onclick=()=>{ SETTINGS.animSpeed=b.dataset.speed; saveSettings(); applySettings(); showSettingsOverlay(); };
+  });
+  $("overlayCard").querySelectorAll("[data-tips]").forEach(b=>{
+    b.onclick=()=>{ SETTINGS.firstTips=b.dataset.tips==="1"; saveSettings(); showSettingsOverlay(); };
+  });
+  $("resetTipsBtn").onclick=()=>{ localStorage.removeItem(TIPS_SEEN_KEY); SEEN_TIPS=new Set(); hint("Tips reset — they'll show again once each."); };
+  $("closeSettings").onclick=()=>{ $("overlay").classList.add("hidden"); if(S) render(); };
+}
+
+/* ============ FIRST-TIME TIPS ============ */
+/* A short, dismissable one-time explainer the first time a player runs into a mechanic
+   that isn't obvious from the board alone (Scry's pick-one modal, Environments triggering
+   before combat, hand-targeting tricks). Toggled off entirely via Settings. Each key only
+   ever fires once per browser, tracked in localStorage separately from SETTINGS itself so
+   "reset seen tips" in Settings doesn't have to touch the rest of the settings object. */
+const TIPS_SEEN_KEY = "gbTipsSeen";
+let SEEN_TIPS = new Set(JSON.parse(localStorage.getItem(TIPS_SEEN_KEY) || "[]"));
+function maybeFirstTip(key, title, body){
+  if(!SETTINGS.firstTips || SEEN_TIPS.has(key)) return;
+  SEEN_TIPS.add(key);
+  localStorage.setItem(TIPS_SEEN_KEY, JSON.stringify([...SEEN_TIPS]));
+  $("overlayCard").innerHTML=`<div class="big">💡</div><h2>${title}</h2><p>${body}</p><button id="closeTip">Got it</button>`;
+  $("overlay").classList.remove("hidden");
+  $("closeTip").onclick=()=>{ $("overlay").classList.add("hidden"); if(S) render(); };
+}
 /* rarity border — common cards (the vast majority, including unset/undefined `r`)
    get no extra class and keep the plain faction-tinted card look; rare/epic/legendary
    get a colored border via the matching .rarity-X CSS rule, wherever the card renders */
@@ -949,7 +1075,7 @@ function playableDecks(side){ return allDecks(side).filter(d=>deckValid(side,d.c
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch])); }
 /* ============ HELPERS ============ */
 const $ = id => document.getElementById(id);
-const sleep = ms => new Promise(r=>setTimeout(r,ms));
+const sleep = ms => new Promise(r=>setTimeout(r,ms*ANIM_SPEED));
 const otherSide = s => s==="plant" ? "zombie" : "plant";
 let S = null;
 let uiLock = false;
@@ -1129,6 +1255,58 @@ function commitMulligan(){
   S.sel=null; render();
 }
 
+/* Hand sorting: toggles between cost-ascending and type-then-cost each tap, so repeated
+   taps cycle rather than just re-doing the same sort. Purely a display reorder of the
+   actual hand array — safe to do any time you don't have a card selected (selection is
+   tracked by index, so it clears first to avoid pointing at the wrong card afterward). */
+let handSortMode = "cost";
+function sortHand(){
+  if(!S || uiLock || S.phase==="combat" || S.over || S.handoff || isAiTurn()) return;
+  const hand=P(S.active).hand;
+  const typeOrder={m:0,e:1,t:2};
+  if(handSortMode==="cost"){
+    hand.sort((a,b)=> a.c-b.c || a.n.localeCompare(b.n));
+    handSortMode="type";
+    hint("Hand sorted by cost");
+  } else {
+    hand.sort((a,b)=> typeOrder[a.t]-typeOrder[b.t] || a.c-b.c || a.n.localeCompare(b.n));
+    handSortMode="cost";
+    hint("Hand sorted by type, then cost");
+  }
+  S.sel=null;
+  render();
+}
+
+/* Lethal indicator: simulates this turn's combat AS IF it resolved right now, using the
+   same trade math as resolveLane/triggerEnvironment (armor absorbs 1, deadly zeroes HP on
+   any damage, strike/frenzy bonus hits require surviving the trade) — just without the
+   animation, DOM writes, or actually mutating game state. Deliberately does NOT account
+   for cards still in hand (tricks that could still be cast, more minions to place) or
+   environments that haven't triggered yet — it's a read of the board as it stands, a hint
+   for "if I stopped right here," not a full turn solver. That scope is called out in the
+   hover tooltip so it doesn't overclaim. */
+function boardLethalDamage(side){
+  const foe=otherSide(side);
+  let dmg=0;
+  for(let i=0;i<5;i++){
+    const mine=S.lanes[i][side], enemy=S.lanes[i][foe];
+    if(!mine) continue;
+    if(!enemy){ dmg+=mine.a; continue; }
+    const enemyArmored=enemy.kw.includes("armored"), mineArmored=mine.kw.includes("armored");
+    let dmgToEnemy=mine.a; if(enemyArmored) dmgToEnemy=Math.max(0,dmgToEnemy-1);
+    let dmgToMine=enemy.a; if(mineArmored) dmgToMine=Math.max(0,dmgToMine-1);
+    const enemyDeadlyKill = dmgToEnemy>0 && mine.kw.includes("deadly");
+    const mineDeadlyKill = dmgToMine>0 && enemy.kw.includes("deadly");
+    let enemyHpAfter = enemy.hp-dmgToEnemy; if(enemyDeadlyKill) enemyHpAfter=Math.min(enemyHpAfter,0);
+    let mineHpAfter = mine.hp-dmgToMine; if(mineDeadlyKill) mineHpAfter=Math.min(mineHpAfter,0);
+    const enemyDied=enemyHpAfter<=0, mineDied=mineHpAfter<=0;
+    if(!mineDied){
+      if(mine.kw.includes("strike")) dmg+=mine.a;
+      else if(enemyDied && mine.kw.includes("frenzy")) dmg+=mine.a;
+    }
+  }
+  return dmg;
+}
 /* ============ PLAYING CARDS ============ */
 function canPlayCard(card){
   if(card.c > P(S.active).res) return false;
@@ -1182,6 +1360,10 @@ function onCardTap(i){
     S.sel=null; render(); return;
   }
   S.sel=i; render();
+  if(card.t==="t" && (card.fx.k==="buffHand"||card.fx.k==="transfigure") && !isAiTurn()){
+    maybeFirstTip("handTargetTrick","✋ Targets a card in your hand",
+      "This one doesn't go on the board — tap a card still in your hand to affect it (highlighted green below). Its new stats carry over automatically once you actually play it.");
+  }
 }
 function cancelSel(){ if(S && S.sel!==null && !uiLock){ S.sel=null; render(); } }
 function onCellTap(lane,side){
@@ -1407,6 +1589,10 @@ function playEnvironment(idx,lane){
   S.lanes[lane].env={n:card.n,e:card.e,side:S.active,fx:card.fx};
   S.sel=null;
   render();
+  if(!isAiTurn()){
+    maybeFirstTip("environment","🌍 Environments",
+      "This sits on the LANE itself, not either side. Right before combat resolves here, it triggers its effect on whatever's occupying the lane, then the fight happens. Playing a new one on an occupied lane replaces (voids) the old one — no undo.");
+  }
 }
 function castTrick(idx,target){
   if(trickBusy){ hint("Wait for the current trick to finish"); return; }
@@ -2056,8 +2242,12 @@ function render(){
   const phName={z1:"🎖️ Regime — play minions",p:"⚔️ Otherworld — play cards",z2:"🎖️ Regime — play tricks",combat:"⚔️ Combat!"}[S.phase]||"—";
   const order=["z1","p","z2","combat"], curIdx=order.indexOf(S.phase);
   const stepLabel={z1:"🎖️ Minions",p:"⚔️ Otherworld",z2:"🎖️ Tricks",combat:"⚔️"};
+  const showLethal = !S.over && S.phase!=="combat" && !S.handoff && !isAiTurn() && boardLethalDamage(S.active)>=P(otherSide(S.active)).hp;
+  const lethalHtml = showLethal
+    ? `<span id="lethalBadge" title="Board damage right now would drop the enemy hero to 0 if combat happened this instant — doesn't account for cards still in hand.">⚡ Lethal now</span>`
+    : "";
   $("phaseBanner").innerHTML =
-    `<div class="turnLabel">Turn ${S.turn} · ${phName}</div>`+
+    `<div class="turnLabel">Turn ${S.turn} · ${phName}${lethalHtml}</div>`+
     `<div class="phaseSteps">`+
     order.map((ph,i)=>`<span class="step${i===curIdx?" now":i<curIdx?" done":""}">${stepLabel[ph]}</span>`).join(`<span class="arrow">›</span>`)+
     `</div>`;
@@ -2074,6 +2264,7 @@ function render(){
   renderHand(selCard);
 
   $("mullBtn").classList.toggle("hidden", !canMulligan()||isAiTurn());
+  $("sortBtn").classList.toggle("hidden", S.phase==="combat"||S.over||S.handoff||isAiTurn());
 
   const btn=$("endBtn");
   if(S.phase==="combat"){ btn.textContent="⚔️ Fighting…"; btn.disabled=true; }
@@ -2142,16 +2333,26 @@ function renderLaneNums(){
   }).join("");
 }
 /* shared by the in-hand card strip and the compendium, so the two never drift apart */
+/* small non-color rarity cue riding next to the card name — the border color alone
+   isn't a reliable rarity signal for colorblind players or in greyscale, so this adds
+   a shape that stays legible either way. Common cards get nothing (unchanged look). */
+function rarityGlyph(card){
+  if(!card.r || card.r==="common") return "";
+  const glyph={rare:"◆",epic:"✦",legendary:"★"}[card.r]||"";
+  return glyph ? ` <span class="rGlyph rGlyph-${card.r}" title="${card.r[0].toUpperCase()+card.r.slice(1)}">${glyph}</span>` : "";
+}
 function cardFaceMarkup(card){
+  // each keyword gets its own title tooltip (desktop hover) so you don't have to leave
+  // the match to remember what Deadly/Armored/Strikethrough/Frenzy does
   let desc = card.t==="m"
-    ? [card.kw.map(k=>KWNAME[k]).join(" "),card.d].filter(Boolean).join(" · ")
+    ? [card.kw.map(k=>`<span class="kwTerm" title="${escapeHtml(KWDESC[k]||"")}">${KWNAME[k]}</span>`).join(" "),card.d].filter(Boolean).join(" · ")
     : card.d;
   const art=artFor(card.n);
   const artHtml = art ? `<img src="${art}" alt="${card.n}" draggable="false">` : `<span class="cEmoji">${card.e}</span>`;
   const typeTag = card.t==="m"
     ? `<div class="cStats"><span class="a">⚔${card.a}</span><span class="h">❤${card.h}</span></div>`
     : card.t==="e" ? `<div class="trickTag envTag">🌍 ENVIRONMENT</div>` : `<div class="trickTag">✨ TRICK</div>`;
-  return `<div class="cost"><span>${card.c}</span></div><div class="cArt">${artHtml}</div><div class="cName">${card.n}</div><div class="cDesc">${desc||""}</div>${typeTag}`;
+  return `<div class="cost"><span>${card.c}</span></div><div class="cArt">${artHtml}</div><div class="cName">${card.n}${rarityGlyph(card)}</div><div class="cDesc">${desc||""}</div>${typeTag}`;
 }
 function renderHand(selCard){
   const handEl=$("hand"); handEl.innerHTML="";
@@ -2265,8 +2466,59 @@ function showHandoff(){
   $("overlay").classList.remove("hidden");
   $("readyBtn").onclick=()=>{ S.handoff=false; $("overlay").classList.add("hidden"); render(); };
 }
+/* ============ MATCH STATS ============ */
+/* Per (side, deck) win/loss record, persisted to localStorage. Recorded once per finished
+   match from the single gameOver() choke point below — every path that ends a match
+   (HP hits 0, or the new Concede button) already funnels through gameOver(winner), so this
+   only needs one hook, not one per ending condition. Deliberately tracks by deck rather
+   than by mode (hotseat vs AI) — the point is "how does this deck actually perform,"
+   which is exactly the playtesting signal the balance-watchlist notes keep asking for. */
+const MATCH_STATS_KEY = "gbMatchStats";
+function loadMatchStats(){
+  try{
+    const raw=JSON.parse(localStorage.getItem(MATCH_STATS_KEY));
+    if(raw && typeof raw==="object") return {plant:raw.plant||{}, zombie:raw.zombie||{}};
+  }catch(e){}
+  return {plant:{}, zombie:{}};
+}
+let MATCH_STATS = loadMatchStats();
+function saveMatchStats(){ try{ localStorage.setItem(MATCH_STATS_KEY, JSON.stringify(MATCH_STATS)); }catch(e){} }
+function recordMatchResult(winnerSide){
+  if(!S || !S.deckIds) return;
+  ["plant","zombie"].forEach(side=>{
+    const id=S.deckIds[side];
+    const deck=getDeck(side,id);
+    const bucket=MATCH_STATS[side];
+    if(!bucket[id]) bucket[id]={wins:0,losses:0,name:deck.name};
+    bucket[id].name=deck.name; // keep the label current if the deck's been renamed since
+    if(side===winnerSide) bucket[id].wins++; else bucket[id].losses++;
+  });
+  saveMatchStats();
+}
+function showMatchStats(){
+  const rows=[];
+  ["plant","zombie"].forEach(side=>{
+    Object.entries(MATCH_STATS[side]).forEach(([id,rec])=>{
+      const total=rec.wins+rec.losses;
+      rows.push({side, name:rec.name, wins:rec.wins, losses:rec.losses, pct: total?Math.round(rec.wins/total*100):0});
+    });
+  });
+  rows.sort((a,b)=>(b.wins+b.losses)-(a.wins+a.losses));
+  const body = rows.length
+    ? `<table class="statsTable"><thead><tr><th></th><th>Deck</th><th>W</th><th>L</th><th>Win%</th></tr></thead><tbody>${
+        rows.map(r=>`<tr><td>${r.side==="plant"?"⚔️":"🎖️"}</td><td>${escapeHtml(r.name)}</td><td class="statsWin">${r.wins}</td><td class="statsLoss">${r.losses}</td><td>${r.pct}%</td></tr>`).join("")
+      }</tbody></table>`
+    : `<p>No finished games yet — this fills in after your first match ends.</p>`;
+  $("overlayCard").innerHTML=`<h2>📊 Match Stats</h2><div class="help">${body}</div><div class="confirmRow">${rows.length?'<button id="clearStatsBtn" class="secondary">Clear</button>':''}<button id="closeStats">Close</button></div>`;
+  $("overlay").classList.remove("hidden");
+  $("closeStats").onclick=()=>{ $("overlay").classList.add("hidden"); if(S) render(); };
+  if(rows.length) $("clearStatsBtn").onclick=()=>{ MATCH_STATS={plant:{},zombie:{}}; saveMatchStats(); showMatchStats(); };
+}
+
 function gameOver(winner){
+  if(!S || S.over) return; // guard against a double call (e.g. HP hits 0 the same instant Concede is pressed)
   S.over=true; uiLock=false; clearSave();
+  recordMatchResult(winner);
   const face=winner==="plant"?"🗡️":"🎖️";
   const heading=winner==="plant"?"The Otherworld wins!":"The Regime wins!";
   const flavor=winner==="plant"?"The story finds its hero.":"The Regime holds absolute power.";
@@ -2287,16 +2539,33 @@ function goHome(){
 }
 function confirmNewGame(){
   if(uiLock){ hint("Wait for combat to finish first"); return; }
-  $("overlayCard").innerHTML=`<div class="big">⚠️</div><h2>Start a new game?</h2><p>This ends the current match for both players — no undo.</p><div class="confirmRow"><button id="cancelNewBtn" class="secondary">Cancel</button><button id="confirmNewBtn" class="danger">New Game</button></div>`;
+  // Concede is offered here rather than as its own control-bar button (already 5 buttons
+  // wide on a phone screen) — it ends the CURRENT match as a loss for whoever's turn it is
+  // and records it in Match Stats, instead of just wiping the board with no result like
+  // New Game does. Only shown mid-match (S exists and isn't already over).
+  const concedeHtml = (S && !S.over)
+    ? `<button id="concedeBtn" class="danger" style="margin-top:8px;width:100%;">🏳️ ${sideName(S.active)} Concedes (counts as a loss)</button>`
+    : "";
+  $("overlayCard").innerHTML=`<div class="big">⚠️</div><h2>Start a new game?</h2><p>This ends the current match for both players — no undo.</p><div class="confirmRow"><button id="cancelNewBtn" class="secondary">Cancel</button><button id="confirmNewBtn" class="danger">New Game</button></div>${concedeHtml}`;
   $("overlay").classList.remove("hidden");
   $("cancelNewBtn").onclick=()=>{ $("overlay").classList.add("hidden"); render(); };
   $("confirmNewBtn").onclick=()=>{ const m=S?S.mode:"hotseat",a=S?S.aiSide:null,d=S?S.deckIds:null; $("overlay").classList.add("hidden"); newGame(m,a,d); };
+  if(S && !S.over) $("concedeBtn").onclick=()=>gameOver(otherSide(S.active));
 }
 /* full battle log — the one-line bar only shows the last 2 events */
+/* pulls the leading emoji run off a log line (every line already starts with one, e.g.
+   "🎖️ Combat begins!" or "🗡️Squire clashes with...") and renders it as a bigger icon chip
+   next to the text — most cards don't have real art (only 2 do today), so actual card-art
+   thumbnails would mostly just be showing the same emoji anyway; this gets the "thumbnail"
+   feel cheaply without a log-format rewrite across all 30+ addLog() call sites. */
+function logIconSplit(line){
+  const m=line.match(/^([\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]+)\s*/u);
+  return m ? {icon:m[1], rest:line.slice(m[0].length)} : {icon:"📜", rest:line};
+}
 function showLogHistory(){
   if(uiLock) return;
   const items = S && S.log.length
-    ? S.log.map(t=>`<p style="margin:3px 0;">${t}</p>`).join("")
+    ? S.log.map(t=>{ const {icon,rest}=logIconSplit(t); return `<div class="logRow"><span class="logIcon">${icon}</span><span class="logText">${rest}</span></div>`; }).join("")
     : "<p>Nothing has happened yet.</p>";
   $("overlayCard").innerHTML=`<h2>🗒 Battle Log</h2><div class="help" style="max-height:50vh;overflow-y:auto;">${items}</div><button id="closeLog">Close</button>`;
   $("overlay").classList.remove("hidden");
@@ -2419,7 +2688,22 @@ function deckContentsHtml(side,deck,ro){
         </div>`;
       }).join("")}</div>`
     : `<p class="dcEmpty">No cards yet — tap ＋ on a card below to add it.</p>`;
-  return `<div class="deckContents"><h4 class="dcTitle">Your Deck <span class="dcCount">${total}/${DECK_SIZE}</span></h4>${body}</div>`;
+  return `<div class="deckContents"><h4 class="dcTitle">Your Deck <span class="dcCount">${total}/${DECK_SIZE}</span></h4>${body}${entries.length?manaCurveHtml(entries,side):""}</div>`;
+}
+/* Mana-curve bar chart — how many cards sit at each cost, so a curve gap (e.g. "nothing
+   below 3") is visible at a glance instead of something you only notice mid-game when you
+   have nothing to play on turn 1. Buckets 7+ together since anything that high is rare. */
+function manaCurveHtml(entries,side){
+  const buckets=new Array(8).fill(0);
+  entries.forEach(e=>{ buckets[Math.min(e.card.c,7)]+=e.c; });
+  const max=Math.max(1,...buckets);
+  const bars=buckets.map((n,i)=>{
+    const h=Math.max(n?6:2, Math.round((n/max)*100));
+    return `<div class="curveBar"><div class="curveBarFill" style="height:${h}%">${n?`<span class="curveN">${n}</span>`:""}</div><span class="curveLabel">${i===7?"7+":i}</span></div>`;
+  }).join("");
+  // colored by the DECK's own faction, not the live match's body[data-active] (which is
+  // about whose turn it is in an active game and has nothing to do with the deck screen)
+  return `<div class="manaCurve${side==="zombie"?" zSide":""}"><h4 class="dcTitle">Mana Curve</h4><div class="curveBars">${bars}</div></div>`;
 }
 function renderDeckEditor(){
   const {side,id}=deckEd;
@@ -2528,6 +2812,8 @@ $("helpBtn").onclick=showHelp;
 $("hintBar").onclick=cancelSel;
 $("logBar").onclick=showLogHistory;
 $("mullBtn").onclick=openMulliganOverlay;
+$("sortBtn").onclick=sortHand;
+$("settingsBtn").onclick=showSettingsOverlay;
 $("zombieBar").onclick=()=>onHeroTap("zombie");
 $("plantBar").onclick=()=>onHeroTap("plant");
 $("playBtn").onclick=startHotseat;
@@ -2559,6 +2845,8 @@ $("deckBody").addEventListener("click", e=>{
 });
 $("resumeBtn").onclick=resumeGame;
 $("compendiumBtn").onclick=()=>{ renderCompendium(); showScreen("compendiumScreen"); };
+$("statsHomeBtn").onclick=showMatchStats;
+$("settingsHomeBtn").onclick=showSettingsOverlay;
 $("compendiumScreen").querySelector(".screenBody").addEventListener("click", e=>{
   const cardEl=e.target.closest(".card");
   if(!cardEl) return;
@@ -2568,6 +2856,7 @@ $("compendiumScreen").querySelector(".screenBody").addEventListener("click", e=>
 $("compBackBtn").onclick=()=>showScreen("homeScreen");
 $("devUnlockBtn").onclick=toggleDevUnlock;
 updateDevUnlockBtn();
+applySettings();
 if(loadSave()) $("resumeBtn").classList.remove("hidden");
 showScreen("homeScreen");
 </script>
